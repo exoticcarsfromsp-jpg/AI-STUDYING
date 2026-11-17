@@ -1,47 +1,43 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>FORJA Gym</title>
-  <meta name="description" content="FORJA: rutinas, ejercicios con modelo 3D, registro de pesos, rangos musculares, dietas y recetas paso a paso.">
-  <meta name="theme-color" content="#0d0f13">
+  <title>FORJA — Entrena, come y progresa</title>
+  <meta name="description" content="Rutina y dieta a tu medida: ejercicios en 3D, platos con foto y gramos exactos, lista de la compra y rangos musculares de Bronce a Simétrico.">
+  <meta name="theme-color" content="#0b0e13">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/forja.css">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8870124159724623" crossorigin="anonymous"></script>
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js", "three/addons/": "./js/vendor/addons/" } }
   </script>
 </head>
 <body>
-  <header class="topbar">
-    <a class="logo" href="#/inicio">
-      <svg class="anvil" viewBox="0 0 32 32"><path d="M3 9h20c0 3 3 5 7 5v2c-4 0-6 1-7 3H11c-1-2-3-3-5-3V12C4 12 3 11 3 9z" fill="#ff6a1a"/><path d="M11 19h12l2 6H9z" fill="#eef1f5"/></svg>
-      <span>FOR<b>JA</b></span>
-    </a>
-    <nav class="topnav" id="topnav"></nav>
-    <div class="spacer"></div>
-    <a class="chip-rank" id="chipRank" href="#/rangos" title="Tu rango global"></a>
-  </header>
-
-  <main id="app"></main>
-
-  <nav class="bottomnav" id="bottomnav"></nav>
-
-  <div class="rest" id="rest" aria-live="polite">
-    <svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#2a303a" stroke-width="4"/><circle id="restArc" cx="18" cy="18" r="15" fill="none" stroke="#ff6a1a" stroke-width="4" stroke-linecap="round" stroke-dasharray="94.2" transform="rotate(-90 18 18)"/></svg>
-    <span class="t" id="restT">1:30</span>
-    <button class="btn sm" data-rest="-15">−15</button>
-    <button class="btn sm" data-rest="15">+15</button>
-    <button class="btn sm primary" data-rest="skip">Saltar</button>
+  <div id="app"></div>
+  <div id="rt" class="rt" onclick="rs()"></div>
+  <div id="xm" class="xm" onclick="if(event.target==this)cm()"></div>
+  <div id="cw" style="display:none">
+    <button id="fab" onclick="tg()" aria-label="Coach IA">💬</button>
+    <div id="cp">
+      <div class="ch"><b>🤖 Coach IA</b><button class="lnk" onclick="tg()">✕</button></div>
+      <div id="cm"></div>
+      <div class="chips" id="cs" style="padding:0 10px"></div>
+      <div class="row" style="padding:8px"><input id="ci" placeholder="Pregúntame lo que quieras…" style="margin:0" onkeydown="if(event.key=='Enter')send()"><button class="btn" style="width:auto;padding:12px 16px" onclick="send()">➤</button></div>
+    </div>
   </div>
-  <div class="toast" id="toast"></div>
-  <footer>FORJA · Tus datos se guardan solo en este dispositivo · <a class="accent" href="#/perfil">Exportar copia</a></footer>
-
-  <noscript>Necesitas activar JavaScript para usar FORJA.</noscript>
-  <script type="module" src="js/app.js"></script>
+  <script src="js/datos.js"></script>
+  <script src="js/cuerpo-datos.js"></script>
+  <script src="js/cuerpo.js"></script>
+  <script src="js/nutricion.js"></script>
+  <script src="js/fotos.js"></script>
+  <script src="js/cocina.js"></script>
+  <script src="js/forja.js"></script>
 </body>
 </html>

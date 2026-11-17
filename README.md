@@ -1,25 +1,34 @@
-# FORJA Gym
+# FORJA — Entrena, come y progresa
 
-Web app de gimnasio en español. Es HTML, CSS y JavaScript sin paso de compilación, así que se puede publicar tal cual en Netlify.
+Web app de gimnasio y nutrición: HTML, CSS y JavaScript sin compilación, lista para publicar en Netlify.
+Está construida sobre la versión original de FORJA y conserva sus cuentas (Supabase), el modo invitado, el coach IA, el análisis de fotos de comida, el calendario, los suplementos y el formato de los datos guardados.
 
-## Qué incluye
+## Novedades
 
-- **Mapa muscular con rangos**: figura frontal y posterior. Cada músculo se colorea con su rango: Bronce, Hierro, Plata, Oro, Platino, Diamante, Esmeralda, Campeón o Simétrico.
-- **Rangos justos**: se calculan con el 1RM estimado (Epley) dividido entre tu peso corporal. Para mujeres hay estándares adaptados. Cada ejercicio muestra el objetivo concreto para llegar al siguiente rango.
-- **42 ejercicios**: cada uno tiene un **modelo 3D animado** (girable y con velocidad ajustable) con los músculos iluminados, un enlace a YouTube, tips, errores comunes, accesorios recomendados, historial, gráfica y récords.
-- **Registro de pesos mejorado**: botones +/− para cambiar el peso, pesos de la última sesión ya rellenados, RPE, aviso de récord en vivo, calculadora de discos y temporizador de descanso automático con sonido.
-- **12 rutinas, 6 planes y modo entreno** guiado con cronómetro y resumen final.
-- **20 recetas**: cada una tiene su ilustración, macros, un selector de raciones y el modo **"Cocínalo tú mismo"**. Ese modo muestra una animación 3D por paso (cortar, hervir, saltear, plancha, horno, batir, emplatar…), temporizadores y lectura en voz alta.
-- **6 dietas y calculadora de calorías y macros** (Mifflin-St Jeor).
-- **Suplementos y accesorios** con imagen, explicación, dosis y nivel de evidencia.
-- Datos guardados en el navegador (localStorage), con exportar e importar en JSON.
+- **Alta en 5 pasos** (sobre ti, objetivo, entreno, comida y tu plan). FORJA elige el estilo de rutina más adecuado y explica por qué. Calcula kcal, macros y agua con tu peso, altura, edad, actividad diaria y días de entreno.
+- **Mapa muscular nuevo** con 15 zonas, manos y pies, y **9 rangos**: Bronce, Hierro, Plata, Oro, Platino, Diamante, Esmeralda, Campeón y Simétrico.
+- **Ejercicios en 3D profesional**: un modelo humano riggeado (Xbot) hace cada ejercicio, con los músculos trabajados coloreados, controles de velocidad y vista, y accesorios recomendados.
+- **Dieta al gramo**: valores BEDCA/USDA por 100 g y kcal según el etiquetado europeo. Las raciones del día se ajustan gramo a gramo para cuadrar kcal, proteína, hidratos y grasa (normalmente a menos de un 2 %). Si con raciones razonables no se llega, se añade un "extra" marcado.
+- **Foto real de cada plato** (Flickr, licencias Creative Commons con uso comercial; autor y enlace en cada foto).
+- **"Cocínalo tú"**: pasos generados con tus gramos exactos (incluida la conversión de crudo a cocido), animados en una cocina 3D, con temporizador y lectura en voz alta.
+- **Compra**: cada ingrediente y la lista semanal enlazan a Mercadona, Lidl, Carrefour, Dia, Alcampo, Condis, Eroski, El Corte Inglés, Consum, bonÀrea y Amazon. La lista se puede copiar o enviar por WhatsApp.
+- **Agua exacta**: 35 ml por kg + 600 ml los días de entreno, con botones de vaso, lata y botella.
+- **Nueva paleta** (tinta + brasa naranja + azul eléctrico), con modo claro automático.
 
-## Fotos reales de los platos
+## Estructura
 
-Por defecto los platos usan ilustraciones generadas. Para poner una foto real:
-
-1. Guárdala en `assets/img/recetas/`.
-2. Añade `foto: 'assets/img/recetas/mi-plato.jpg'` a la receta en `js/data/recipes.js`.
+| Archivo | Contenido |
+|---|---|
+| `index.html`, `config.js` | Página y configuración pública de Supabase |
+| `css/forja.css` | Estilos y paleta |
+| `js/datos.js` | Catálogo de ejercicios, estilos de rutina y menús |
+| `js/nutricion.js` | Tabla nutricional, ajuste de raciones, agua, supermercados |
+| `js/cuerpo.js`, `js/cuerpo-datos.js` | Rangos y mapa muscular |
+| `js/cocina.js` | Generador de pasos del modo cocina |
+| `js/fotos.js`, `assets/img/comidas/` | Fotos de los platos y sus créditos |
+| `js/forja.js` | La aplicación |
+| `js/three/humano.js`, `assets/3d/Xbot.glb` | Visor 3D de ejercicios |
+| `js/three/cocina.js` | Cocina 3D |
 
 ## Probar en local
 
@@ -29,11 +38,8 @@ python3 -m http.server 8000
 
 Después abre http://localhost:8000.
 
-## Estructura
+## Créditos
 
-- `js/data/`: ejercicios, rutinas y planes, recetas y dietas, suplementos y accesorios, rangos
-- `js/three/mannequin.js`: el maniquí 3D y las poses de cada ejercicio
-- `js/three/kitchen.js`: la cocina 3D
-- `js/bodymap.js`: el mapa muscular SVG
-- `js/app.js`: las pantallas
-- `js/ui.js`: los componentes reutilizables (registro de series, temporizador, gráficas)
+- Modelo 3D Xbot: ejemplos de three.js (Mixamo).
+- Geometría del mapa muscular: react-body-highlighter (licencia MIT).
+- Fotos: autores de Flickr indicados en cada imagen.
