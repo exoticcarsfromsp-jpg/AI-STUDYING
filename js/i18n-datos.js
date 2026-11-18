@@ -1579,4 +1579,12 @@ window.TRD=[["# años · # cm · # kg","# years · # cm · # kg","# anys · # cm
 ["clara","egg white","clara","blanc d'œuf","clara"],
 ["tomates","tomatoes","tomàquets","tomates","tomates"],
 ["español","Spanish","castellà","espagnol","espanhol"],
-["PC","BW","PC","PC","PC"]];
+["PC","BW","PC","PC","PC"],
+["Full body","Full body","Full body","Full body","Full body"],
+["Push / Pull / Legs","Push / Pull / Legs","Push / Pull / Legs","Push / Pull / Legs","Push / Pull / Legs"],
+["Push","Push","Push","Push","Push"],
+["Pull","Pull","Pull","Pull","Pull"],
+["Legs","Legs","Legs","Legs","Legs"],
+["PHUL","PHUL","PHUL","PHUL","PHUL"],
+["HIIT","HIIT","HIIT","HIIT","HIIT"],
+["# series × #-# reps","# sets × #-# reps","# sèries × #-# reps","# séries × #-# reps","# séries × #-# reps"]];
