@@ -282,6 +282,18 @@ const STY = {
   ],
 };
 Object.assign(STY, {
+  pplul: [
+    ["pecho", "hombro", "brazo"],
+    ["espalda", "brazo", "core"],
+    ["pierna", "glúteo"],
+    ["pecho", "espalda", "hombro", "brazo"],
+    ["pierna", "glúteo", "core"],
+  ],
+  sal: [
+    ["pierna", "pecho", "espalda", "core"],
+    ["cardio", "core", "hombro"],
+    ["glúteo", "espalda", "brazo", "cardio"],
+  ],
   arn: [
     ["pecho", "espalda"],
     ["hombro", "brazo"],
@@ -609,6 +621,43 @@ MR.s.push(
   "Queso fresco con nueces;lactosa,frutos secos;queso fresco:100,nueces:15",
 );
 
+// ───── Recetas nuevas (FORJA 3) ─────
+MR.d.push(
+  "Overnight oats de cacao y plátano;gluten,lactosa;avena:60,leche:200,cacao puro:8,plátano:100,chía:10",
+  "Tostada de salmón ahumado y aguacate;gluten,pescado;pan integral:70,salmón:60,aguacate:50,tomate:40",
+  "Shakshuka con pan integral;huevo,gluten;huevo:120,salsa de tomate:200,pimiento:80,cebolla:50,pan integral:50,aceite de oliva:5",
+  "Tortitas de proteína con arándanos;gluten,lactosa,huevo;avena:50,proteína en polvo:30,claras:100,arándanos:80",
+  "Tostada de crema de cacahuete y plátano;gluten,frutos secos;pan integral:60,crema de cacahuete:20,plátano:80",
+);
+MR.c.push(
+  "Paella de pollo y verduras;;arroz:80,pollo:150,judías verdes:80,pimiento:60,salsa de tomate:40,aceite de oliva:10",
+  "Fajitas de pollo;gluten;wrap:80,pollo:160,pimiento:120,cebolla:60,aceite de oliva:5",
+  "Poke bowl de salmón;pescado,soja;arroz:70,salmón:130,aguacate:50,edamame:50,pepino:80,salsa de soja:10",
+  "Pasta con pollo al pesto;gluten,lactosa,frutos secos;pasta integral:90,pollo:140,queso parmesano:15,nueces:10,espinacas:60,aceite de oliva:8",
+  "Arroz con pollo al curry;;arroz:80,pollo:160,leche de coco light:80,cebolla:60,pimiento:60",
+  "Garbanzos con bacalao y espinacas;pescado;garbanzos:80,bacalao:150,espinacas:120,aceite de oliva:10",
+  "Albóndigas de pavo en salsa de tomate;;pavo picado:170,salsa de tomate:150,arroz:70,cebolla:40",
+  "Burrito bowl de ternera;;arroz:70,ternera picada:140,judías blancas:40,maíz:60,tomate:80,aguacate:40",
+  "Pad thai de gambas;marisco,huevo,frutos secos,soja;fideos de arroz:80,gambas:150,huevo:60,cebolla:40,salsa de soja:15,almendras:10",
+  "Lentejas a la riojana fit;;lentejas:90,pimiento:60,cebolla:50,zanahoria:60,jamón serrano:20,aceite de oliva:8",
+  "Bowl de quinoa y garbanzos asados;;quinoa:70,garbanzos:70,pimiento:80,pepino:80,aceite de oliva:8",
+);
+MR.n.push(
+  "Ensalada César con pollo;gluten,lactosa;pollo:150,ensalada:150,queso parmesano:15,pan integral:30,yogur griego:40",
+  "Tortilla de patatas fit;huevo;huevo:180,patata:200,cebolla:50,aceite de oliva:10",
+  "Pisto con huevo;huevo;calabacín:150,pimiento:100,berenjena:100,salsa de tomate:100,huevo:120,aceite de oliva:8",
+  "Salmón al papillote con verduras;pescado;salmón:150,calabacín:150,zanahoria:80,cebolla:40",
+  "Hamburguesa de pollo en pan integral;gluten,lactosa;pollo:150,pan integral:70,tomate:60,ensalada:50,queso fresco:30",
+  "Sopa de pollo con fideos;gluten;pollo:130,pasta integral:40,zanahoria:80,cebolla:40",
+  "Revuelto de tofu y verduras;soja;tofu:200,pimiento:80,espinacas:80,cebolla:40,aceite de oliva:5",
+  "Tacos veganos de lentejas;;tortilla de maíz:80,lentejas:70,aguacate:50,tomate:60",
+);
+MR.s.push(
+  "Skyr con frutos rojos;lactosa;yogur griego:200,arándanos:60,fresas:60",
+  "Barritas caseras de avena y dátiles;gluten,frutos secos;avena:40,dátiles:30,almendras:15",
+  "Batido verde de proteína;lactosa;proteína en polvo:30,espinacas:40,plátano:100,leche:200",
+  "Sándwich de pavo y queso fresco;gluten,lactosa;pan integral:60,pavo:60,queso fresco:40,tomate:40",
+);
 const MEAT = [
     "pollo",
     "ternera",
@@ -639,6 +688,7 @@ const MEAT = [
     "queso cottage",
     "mozzarella light",
     "proteína en polvo",
+    "queso parmesano",
   ];
 const MEALS = Object.fromEntries(
   Object.entries(MR).map(([k, a]) => [
@@ -670,7 +720,7 @@ const MT = {
     fuerza: ["d", "m", "c", "s", "n"],
     mantener: ["d", "c", "s", "n"],
   },
-  act = () => MS[U.p.goal],
+  act = () => (U.p.dt == "ayuno" ? ["c", "s", "n"] : MS[U.p.goal]),
   sh = (t) => MT[t][2] / act().reduce((x, y) => x + MT[y][2], 0),
   DN = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 

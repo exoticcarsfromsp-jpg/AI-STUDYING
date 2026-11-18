@@ -125,19 +125,24 @@ async function SBAI(prompt, o) {
 SBAI.limits = async () => ({
   images: { maxCount: 1, mediaTypes: ["image/jpeg"] },
 });
+// ¿Responde el servidor de cuentas? (4 s máx.)
+let SBOK = false;
+async function sbPing() {
+  try {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 4000);
+    const r = await fetch(CFG.SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/health", { headers: { apikey: CFG.SUPABASE_ANON_KEY }, signal: c.signal });
+    clearTimeout(t);
+    return r.status < 500;
+  } catch (e) { return false; }
+}
 async function sbInit() {
-  SB = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  });
-  const { data } = await SB.auth.getSession();
-  if (data && data.session) {
-    await sbLoad(data.session.user);
-    return true;
-  }
+  SBOK = await sbPing();
+  if (!SBOK) return false;
+  SB = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  try {
+    const { data } = await SB.auth.getSession();
+    if (data && data.session) { await sbLoad(data.session.user); return true; }
+  } catch (e) {}
   return false;
 }
 async function sbLoad(u) {
@@ -184,15 +189,23 @@ async function sbLoad(u) {
   U.p ? app() : onb();
   if (imp) sv();
 }
-const HERO = () => `<div class=hero><div class=blob></div><div class="blob b2"></div><div class=wrap><span class=kick>Entrena · Come · Progresa</span><h1>FORJA<span>.</span></h1><p class=sub>Tu rutina y tu dieta a medida en 2 minutos: ejercicios en 3D, platos con foto y gramos exactos, lista de la compra y rangos de Bronce a Simétrico.</p>
+const HERO = () => `<div class=hero><div class=blob></div><div class="blob b2"></div><div class=wrap><div class=row style="margin-top:20px"><span class=kick style="margin:0">Entrena · Come · Progresa</span><button class=langb onclick="langSheet()">🌍 ${LANGS[LANG][1]}</button></div><h1>FORJA<span>.</span></h1><p class=sub>Tu rutina y tu dieta a medida en 2 minutos: ejercicios en 3D, platos con foto y gramos exactos, lista de la compra y rangos de Bronce a Simétrico.</p>
 <div class=heroimg><svg viewBox="-9 -2 236 230">${BDEFS}<g>${figSVG({ pecho: 6, hombro: 8, biceps: 5, abdomen: 2, oblicuos: 2, cuadriceps: 4, aductores: 4, gemelo: 3, trapecio: 2 }, [], 0)}</g><g transform="translate(118 0)">${figSVG({ trapecio: 2, hombro: 8, dorsal: 8, triceps: 5, lumbar: 4, gluteo: 8, isquios: 4, gemelo: 3, aductores: 4 }, [], 1)}</g></svg>${rankLegend(-1)}</div>
 <ul class=feat><li>🧍 Cada ejercicio en 3D</li><li>🍽 Dieta al gramo</li><li>🛒 Compra en tu súper</li><li>🤖 Coach IA</li></ul>`;
-function sbAuth() {
-  $("#cw").style.display = "none";
-  A.innerHTML = `${HERO()}<div class="card auth"><button class=btn onclick="guest()">Empezar sin cuenta</button><p class=mut style="text-align:center;margin:8px 0 0;font-size:13px">Sin registrarte: tus datos se guardan en este navegador y el chat y el análisis de fotos funcionan igual.</p></div>
-<div class="card auth"><div class=tabs2><button class="${mode == "reg" ? "on" : ""}" onclick="mode='reg';auth()">Crear cuenta</button><button class="${mode != "reg" ? "on" : ""}" onclick="mode='log';auth()">Iniciar sesión</button></div><p class=mut style="margin:8px 0 10px;font-size:13px">Con una cuenta tu plan te sigue a cualquier dispositivo y la sesión se queda abierta.</p>${mode == "reg" ? '<label>Nombre</label><input id=nm placeholder="Tu nombre" autocomplete=name>' : ""}<label>Email</label><input id=em type=email placeholder="tu@email.com" autocomplete=email><label>Contraseña (6+ caracteres)</label><input id=pw type=password placeholder="••••••" autocomplete="${mode == "reg" ? "new-password" : "current-password"}" onkeydown="if(event.key=='Enter')sbEmail()">
-<div id=er style="color:#ff5d6c;min-height:20px"></div><button class=btn onclick="sbEmail()">${mode == "reg" ? "Crear cuenta" : "Entrar"}</button></div></div></div>`;
+function sbAuth() { auth(); }
+// Traduce los errores de Supabase / red a mensajes claros
+function authErr(e) {
+  const m = String((e && (e.message || e.error_description)) || e || "");
+  if (/load failed|failed to fetch|networkerror|network request|fetch/i.test(m)) return "net";
+  if (/invalid login|invalid credentials/i.test(m)) return "Email o contraseña incorrectos.";
+  if (/already registered|already exists|user_already/i.test(m)) return "Ese email ya tiene cuenta: inicia sesión.";
+  if (/not confirmed/i.test(m)) return "Confirma tu email: te enviamos un enlace al registrarte (mira también en spam).";
+  if (/rate limit|too many/i.test(m)) return "Demasiados intentos. Espera un minuto y vuelve a probar.";
+  if (/password/i.test(m)) return "La contraseña debe tener al menos 6 caracteres.";
+  if (/email/i.test(m)) return "Revisa el email: no parece válido.";
+  return m || "No se pudo completar. Inténtalo de nuevo.";
 }
+function authBusy(on) { const b = $("#authgo"); if (b) { b.disabled = on; b.classList.toggle("busy", on); } }
 function guest() {
   try {
     const l = JSON.parse(localStorage.getItem("forja_root") || "null");
@@ -225,31 +238,7 @@ function toReg() {
   mode = "reg";
   auth();
 }
-async function sbEmail() {
-  const e = v("em").trim().toLowerCase(),
-    p = v("pw"),
-    er = $("#er");
-  if (!e.includes("@") || p.length < 6)
-    return (er.textContent = "Email válido y contraseña de 6+ caracteres");
-  if (mode == "reg") {
-    const { data, error } = await SB.auth.signUp({
-      email: e,
-      password: p,
-      options: { data: { name: v("nm") } },
-    });
-    if (error) return (er.textContent = error.message);
-    if (!data.session)
-      return (er.textContent =
-        "Te hemos enviado un email para confirmar tu cuenta. Confírmalo y vuelve a entrar.");
-    return sbLoad(data.user);
-  }
-  const { data, error } = await SB.auth.signInWithPassword({
-    email: e,
-    password: p,
-  });
-  if (error) return (er.textContent = "Email o contraseña incorrectos");
-  sbLoad(data.user);
-}
+async function sbEmail() { return go(); }
 async function logout() {
   if (SBU) {
     try {
@@ -332,45 +321,77 @@ async function init() {
     U.p ? app() : onb();
   } else auth();
 }
-function auth() {
-  if (SB) return sbAuth();
+function auth(msg) {
   $("#cw").style.display = "none";
-  A.innerHTML = `${HERO()}<div class="card auth"><div class=tabs2><button class="${mode == "reg" ? "on" : ""}" onclick="mode='reg';auth()">Crear cuenta</button><button class="${mode != "reg" ? "on" : ""}" onclick="mode='log';auth()">Iniciar sesión</button></div>${mode == "reg" ? '<label>Nombre</label><input id=nm placeholder="Tu nombre">' : ""}<label>Email</label><input id=em type=email placeholder="tu@email.com"><label>Contraseña (6+ caracteres)</label><input id=pw type=password placeholder="••••••" onkeydown="if(event.key=='Enter')go()">
-<div id=er style="color:#ff5d6c;min-height:20px"></div><button class=btn onclick="go()">${mode == "reg" ? "Crear cuenta" : "Entrar"}</button>
-<p class=mut style="margin:8px 0 0;font-size:12px">${DBR ? "☁️ Tus cuentas se guardan en la nube de tu sesión de Claude." : "💾 Sin sesión de Claude: las cuentas se guardan solo en este navegador."}</p></div></div></div>`;
+  const reg = mode == "reg", cloud = SB && SBOK;
+  A.innerHTML = `${HERO()}<div class="card auth" id=authc><div class=tabs2><button class="${reg ? "on" : ""}" onclick="mode='reg';auth()">Crear cuenta</button><button class="${!reg ? "on" : ""}" onclick="mode='log';auth()">Iniciar sesión</button></div>
+<form onsubmit="event.preventDefault();go()" novalidate>${reg ? '<label for=nm>Nombre</label><input id=nm placeholder="Tu nombre" autocomplete=name>' : ""}<label for=em>Email</label><input id=em type=email inputmode=email placeholder="tu@email.com" autocomplete=email required><label for=pw>Contraseña${reg ? " (mínimo 6 caracteres)" : ""}</label><div class=pwb><input id=pw type=password placeholder="••••••" minlength=6 autocomplete="${reg ? "new-password" : "current-password"}" required><button type=button class=eye onclick="const i=$('#pw');i.type=i.type=='password'?'text':'password';this.textContent=i.type=='password'?'👁':'🙈'" aria-label="Mostrar contraseña">👁</button></div>
+<div id=er class=err role=alert>${msg || ""}</div><button class=btn id=authgo type=submit><span>${reg ? "Crear cuenta" : "Entrar"}</span></button></form>
+${!reg && cloud ? `<button class=lnk onclick="forgot()">¿Has olvidado tu contraseña?</button>` : ""}
+<p class="mut where">${cloud ? "☁️ Tu cuenta se guarda en la nube: entra desde cualquier dispositivo." : DBR ? "☁️ Tus cuentas se guardan en la nube de tu sesión de Claude." : "📱 Tu cuenta se guarda de forma segura en este dispositivo (contraseña cifrada). Exporta tus datos desde Perfil para pasarlos a otro móvil."}</p></div>
+<div class="card auth guestc"><button class="btn ghost" onclick="guest()">Probar sin cuenta →</button><p class=mut style="text-align:center;margin:8px 0 0;font-size:13px">Tus datos se quedan en este navegador. Podrás crear la cuenta después y se conserva todo.</p></div></div></div>`;
+  setTimeout(() => $(reg ? "#nm" : "#em")?.focus(), 50);
+}
+async function forgot() {
+  const e = (v("em") || "").trim().toLowerCase(), er = $("#er");
+  if (!e.includes("@")) { er.textContent = "Escribe tu email arriba y vuelve a pulsar."; return $("#em").focus(); }
+  try { const { error } = await SB.auth.resetPasswordForEmail(e, { redirectTo: location.origin + location.pathname }); if (error) throw error; er.className = "err ok"; er.textContent = "Te hemos enviado un email para cambiar la contraseña."; }
+  catch (x) { er.textContent = authErr(x) == "net" ? "No hay conexión con el servidor de cuentas." : authErr(x); }
+}
+// Contraseñas locales: PBKDF2-SHA256 con sal por cuenta (las cuentas antiguas con SHA-256 siguen funcionando)
+async function pbk(pw, salt) {
+  try {
+    const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
+    const b = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 120000 }, k, 256);
+    return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+  } catch (e) { return hs(salt + pw); }
 }
 async function go() {
-  const e = v("em").trim().toLowerCase(),
-    p = v("pw"),
-    er = $("#er");
-  if (!e.includes("@") || p.length < 6)
-    return (er.textContent = "Email válido y contraseña de 6+ caracteres");
-  const k = (await hs("k:" + e)).slice(0, 20),
-    h = await hs(e + p);
-  if (mode == "reg") {
-    if (ROOT.acc[k])
-      return (er.textContent = "Ese email ya existe: inicia sesión");
-    const u = {
-      name: v("nm") || "Atleta",
-      p: null,
-      routine: [],
-      logs: {},
-      weights: [],
-      ch: {},
-      sm: "mercadona",
-    };
-    if (ROOT.legacy) {
-      Object.assign(u, ROOT.legacy);
-      delete ROOT.legacy;
+  const e = v("em").trim().toLowerCase(), p = v("pw"), er = $("#er"), reg = mode == "reg";
+  er.className = "err";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) { er.textContent = "Escribe un email válido (ej. nombre@gmail.com)."; return $("#em").focus(); }
+  if (p.length < 6) { er.textContent = "La contraseña debe tener al menos 6 caracteres."; return $("#pw").focus(); }
+  authBusy(true);
+  try {
+    // 1) Cuenta en la nube (Supabase), si el servidor responde
+    if (SB && SBOK) {
+      try {
+        if (reg) {
+          const { data, error } = await SB.auth.signUp({ email: e, password: p, options: { data: { name: v("nm") }, emailRedirectTo: location.origin + location.pathname } });
+          if (error) throw error;
+          if (!data.session) { er.className = "err ok"; er.textContent = "¡Cuenta creada! Te hemos enviado un email para confirmarla. Confírmala y vuelve a entrar."; return; }
+          return sbLoad(data.user);
+        }
+        const { data, error } = await SB.auth.signInWithPassword({ email: e, password: p });
+        if (error) throw error;
+        return sbLoad(data.user);
+      } catch (x) {
+        const m = authErr(x);
+        if (m != "net") { er.textContent = m; return; }
+        SBOK = false; // sin conexión: seguimos con cuenta en el dispositivo
+      }
     }
-    ROOT.acc[k] = { e, h, u };
-  } else if (!ROOT.acc[k] || ROOT.acc[k].h != h)
-    return (er.textContent = "Email o contraseña incorrectos");
-  ROOT.last = k;
-  U = ROOT.acc[k].u;
-  sv();
-  if (U.p) D = nxt();
-  U.p ? app() : onb();
+    // 2) Cuenta en este dispositivo
+    const k = (await hs("k:" + e)).slice(0, 20), acc = ROOT.acc[k];
+    if (reg) {
+      if (acc) { er.textContent = "Ese email ya tiene cuenta en este dispositivo: inicia sesión."; return; }
+      const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const g = ROOT.acc.guest && ROOT.acc.guest.u && ROOT.acc.guest.u.p ? ROOT.acc.guest.u : null;
+      const u = g ? { ...g, name: v("nm") || g.name || "Atleta" } : { name: v("nm") || "Atleta", p: null, routine: [], logs: {}, weights: [], ch: {}, sm: "mercadona" };
+      if (ROOT.legacy) { Object.assign(u, ROOT.legacy); delete ROOT.legacy; }
+      ROOT.acc[k] = { e, s: salt, h2: await pbk(p, salt), u };
+    } else {
+      const ok = acc && (acc.h2 ? (await pbk(p, acc.s)) == acc.h2 : acc.h == (await hs(e + p)));
+      if (!ok) { er.textContent = acc ? "Contraseña incorrecta." : "No hay ninguna cuenta con ese email en este dispositivo. ¿Quieres crearla?"; return; }
+      if (!acc.h2) { acc.s = Math.random().toString(36).slice(2); acc.h2 = await pbk(p, acc.s); delete acc.h; }
+    }
+    ROOT.last = k;
+    U = ROOT.acc[k].u;
+    localStorage.setItem("forja_root", JSON.stringify(ROOT));
+    sv();
+    if (U.p) D = nxt();
+    U.p ? app() : onb();
+  } finally { authBusy(false); }
 }
 let OW = null, OS = 0;
 const OSTEPS = ["Sobre ti", "Objetivo", "Entreno", "Comida", "Tu plan"];
@@ -418,15 +439,15 @@ function onbR() {
 <label>¿Ya tienes rutina?</label><div class=opts2>${opt("own", 0, "✨", "Genérame una")}${opt("own", 1, "✍️", "La añadiré yo")}</div>
 <details style="margin-top:8px"><summary class=mut>Elegir estilo manualmente</summary><select data-ow=sty><option value=auto ${W.sty == "auto" ? "selected" : ""}>Recomendado por FORJA</option>${Object.entries(STYN).map(([k, t]) => `<option value=${k} ${W.sty == k ? "selected" : ""}>${t}</option>`).join("")}</select></details></div>`;
   if (OS == 3)
-    body = `<h2>Tu alimentación</h2><div class=opts>${opt("dt", "omni", "🍗", "Omnívora")}${opt("dt", "med", "🫒", "Mediterránea")}${opt("dt", "veg", "🥚", "Vegetariana")}${opt("dt", "vgn", "🌱", "Vegana")}${opt("dt", "lc", "🥑", "Baja en hidratos")}</div>
+    body = `<h2>Tu alimentación</h2><div class=opts>${opt("dt", "omni", "🍗", "Omnívora")}${opt("dt", "med", "🫒", "Mediterránea")}${opt("dt", "veg", "🥚", "Vegetariana")}${opt("dt", "vgn", "🌱", "Vegana")}${opt("dt", "lc", "🥑", "Baja en hidratos")}${opt("dt", "hp", "🥩", "Alta en proteína", "2,4 g por kg")}${opt("dt", "ayuno", "⏱️", "Ayuno 16:8", "Comes de 13 a 21 h")}${opt("dt", "eco", "💶", "Económica", "Sin productos caros")}${opt("dt", "sg", "🌾", "Sin gluten", "Celiaquía o sensibilidad")}</div>
 <div class=card><label>¿Qué te gusta comer? (separado por comas)</label><input data-ow=likes placeholder="pollo, arroz, plátano…" value="${esc(W.likes)}"><label>¿Algo que no quieras ver en tu dieta?</label><input data-ow=dis placeholder="pescado, champiñón…" value="${esc(W.dis)}"><label>Alergias / intolerancias</label><div class=chk>${["gluten", "lactosa", "frutos secos", "huevo", "pescado", "marisco", "soja"].map((a) => `<label><input type=checkbox value="${a}" class=al ${W.al.includes(a) ? "checked" : ""}>${a}</label>`).join("")}</div></div>`;
   if (OS == 4) {
     const p = onbP(), t = tgtFor(p, p.w), r = recSty(p), sty = p.sty != "auto" ? p.sty : r.k, ml = Math.round((p.w * 35) / 50) * 50;
     body = `<h2>Tu plan personalizado</h2><div class="card plan"><small>Rutina recomendada</small><div class=big>${STYN[sty]}</div><p class=mut style="margin:4px 0 0">${p.sty != "auto" ? "Elegida por ti." : r.why}</p><div class=tags><span>📅 ${p.days} días/semana</span><span>⏱ ${p.mins} min</span><span>${{ gym: "🏢 Gimnasio", home: "🏠 Casa", park: "🌳 Parque" }[p.where]}</span><span>🎯 ${GN[p.goal]}</span><span>${SR[p.goal][0]} series × ${SR[p.goal][1]} reps</span></div></div>
-<div class="card plan"><small>Tu nutrición diaria</small><div class=stats style="grid-template-columns:repeat(4,1fr);margin-top:8px"><div><b>${t.k}</b><small>kcal</small></div><div><b>${t.pr} g</b><small>proteína</small></div><div><b>${t.ca} g</b><small>hidratos</small></div><div><b>${t.fa} g</b><small>grasas</small></div></div><p class=mut style="margin:8px 0 0;font-size:13px">Metabolismo basal ${t.bmr} kcal · ${MS[p.goal].length} comidas al día · 💧 ${(ml / 1000).toFixed(1).replace(".", ",")} L de agua (+600 ml los días de entreno)</p></div>
+<div class="card plan"><small>Tu nutrición diaria</small><div class=stats style="grid-template-columns:repeat(4,1fr);margin-top:8px"><div><b>${t.k}</b><small>kcal</small></div><div><b>${t.pr} g</b><small>proteína</small></div><div><b>${t.ca} g</b><small>hidratos</small></div><div><b>${t.fa} g</b><small>grasas</small></div></div><p class=mut style="margin:8px 0 0;font-size:13px">Metabolismo basal ${t.bmr} kcal · ${p.dt == "ayuno" ? 3 : MS[p.goal].length} comidas al día · 💧 ${(ml / 1000).toFixed(1).replace(".", ",")} L de agua (+600 ml los días de entreno)</p></div>
 <div class="card plan"><small>Además tendrás</small><ul class=feat><li>📸 Fotos de cada plato con gramos exactos y receta paso a paso en 3D</li><li>🛒 Lista de la compra con enlaces a Mercadona, Lidl, Carrefour, Dia, Condis…</li><li>🏅 Rangos de Bronce a Simétrico en tu mapa muscular</li><li>🧍 Cada ejercicio en 3D, con vídeo y técnica</li></ul></div>`;
   }
-  A.innerHTML = `<div class="wrap onb"><div class=onbh><span class=logo>FORJA<span>.</span></span><small>Paso ${OS + 1} de ${OSTEPS.length} · ${OSTEPS[OS]}</small></div><div class=bar style="margin-bottom:14px"><i style="width:${((OS + 1) / OSTEPS.length) * 100}%"></i></div>
+  A.innerHTML = `<div class="wrap onb"><div class=onbh><span class=logo>FORJA<span>.</span></span><span class=row style="gap:8px"><small>Paso ${OS + 1} de ${OSTEPS.length} · ${OSTEPS[OS]}</small><button class=langb onclick="langSheet()">🌍 ${LANGS[LANG][1]}</button></span></div><div class=bar style="margin-bottom:14px"><i style="width:${((OS + 1) / OSTEPS.length) * 100}%"></i></div>
 ${OS == 0 ? `<h1 style="font-size:38px;margin:10px 0 4px">Hola${OW.nm ? ", " + esc(OW.nm) : ""} 👋</h1><p class=sub>Responde 5 pasos y te monto rutina, dieta y suplementación a tu medida.</p>` : ""}${body}
 <div class=row style="margin-top:16px;gap:10px">${OS ? `<button class="btn ghost" style="width:auto" onclick="onbGo(-1)">← Atrás</button>` : ""}${OS < OSTEPS.length - 1 ? `<button class=btn onclick="onbGo(1)">Siguiente →</button>` : `<button class=btn onclick="saveP()">Crear mi plan 🚀</button>`}</div></div>`;
 }
@@ -547,16 +568,17 @@ function pickEx(g, where, n, i, lv) {
     }
   return out;
 }
-const STYN = { fb: "Full body", ul: "Torso / Pierna", ppl: "Push / Pull / Legs", bro: "Un músculo por día", glu: "Enfoque glúteo y pierna", def: "Definición con cardio", arn: "Estilo Arnold", sup: "Énfasis tren superior", inf: "Énfasis tren inferior", cal: "Calistenia (parque)", hiit: "Cardio y HIIT" };
+const DTN = { omni: "🍗 Omnívora", med: "🫒 Mediterránea", hp: "🥩 Alta en proteína", veg: "🥚 Vegetariana", vgn: "🌱 Vegana", lc: "🥑 Baja en hidratos", ayuno: "⏱️ Ayuno 16:8", eco: "💶 Económica", sg: "🌾 Sin gluten" };
+const STYN = { fb: "Full body", ul: "Torso / Pierna", ppl: "Push / Pull / Legs", bro: "Un músculo por día", glu: "Enfoque glúteo y pierna", def: "Definición con cardio", arn: "Estilo Arnold", sup: "Énfasis tren superior", inf: "Énfasis tren inferior", cal: "Calistenia (parque)", hiit: "Cardio y HIIT", pplul: "PPL + Torso/Pierna (5 días)", sal: "Salud y forma" };
 // Elige el mejor estilo de rutina para la persona y explica por qué
 function recSty(p) {
   const d = p.days, b = p.lv == "b";
   if (p.where == "park") return { k: "cal", why: "Entrenas en parque: calistenia con progresiones de dominadas, fondos y piernas." };
   if (p.focus == "inf") return { k: d >= 5 ? "glu" : "inf", why: "Quieres priorizar piernas y glúteo: más volumen de tren inferior manteniendo el torso." };
   if (p.focus == "sup") return { k: "sup", why: "Quieres priorizar el tren superior: pecho, espalda y brazos más veces por semana." };
-  if (p.goal == "grasa") return d >= 5 ? { k: "def", why: "Con 5–6 días y objetivo de perder grasa combinamos fuerza (para no perder músculo) y cardio." } : { k: d <= 3 ? "fb" : "ul", why: `Con ${d} días, ${d <= 3 ? "full body" : "torso/pierna"} trabaja cada músculo 2 veces por semana y quema más calorías por sesión.` };
+  if (p.goal == "grasa") return d >= 5 ? { k: "def", why: "Con 5–6 días y objetivo de perder grasa combinamos fuerza (para no perder músculo) y cardio." } : { k: d <= 3 ? "fb" : "ul", why: L(d <= 3 ? "Con {0} días, full body trabaja cada músculo 2 veces por semana y quema más calorías por sesión." : "Con {0} días, torso/pierna trabaja cada músculo 2 veces por semana y quema más calorías por sesión.", d) };
   if (p.goal == "fuerza") return { k: d <= 3 ? "fb" : "ul", why: "Para ganar fuerza conviene repetir los básicos (sentadilla, press, peso muerto) varias veces por semana." };
-  if (d <= 3) return { k: "fb", why: `${b ? "Eres principiante y" : "Con"} ${d} días: full body es lo más eficiente, cada músculo 2–3 veces por semana.` };
+  if (d <= 3) return { k: "fb", why: L(b ? "Eres principiante y {0} días: full body es lo más eficiente, cada músculo 2–3 veces por semana." : "Con {0} días: full body es lo más eficiente, cada músculo 2–3 veces por semana.", d) };
   if (d == 4) return { k: "ul", why: "Con 4 días, torso/pierna da la frecuencia ideal (2 veces por semana) con sesiones asumibles." };
   return { k: b ? "ul" : "ppl", why: b ? "Aunque tienes 5–6 días, siendo principiante torso/pierna te deja recuperar mejor." : "Con 5–6 días, Push/Pull/Legs reparte mucho volumen y deja recuperar cada músculo." };
 }
@@ -758,9 +780,9 @@ const pvh = (w, r, need, n) => {
   if (need && !w) return "<small>Elige el peso para ver tu rango.</small>";
   const k = rk(w, r, n),
     nx = k.m
-      ? Math.ceil(k.th[k.i] * bw()) + " kg de 1RM est."
+      ? L("{0} kg de 1RM est.", Math.ceil(k.th[k.i] * bw()))
       : k.th[k.i] + (n && dif(n) == 0 ? " s" : " reps");
-  return `<div class=lad>${R.map((n, i) => `<i class="${i < k.i ? "d" : i == k.i ? "c" : ""}" style="--c:${C[i]}"></i>`).join("")}</div><div class=row>${bdg(k.i)}<small>${k.m ? "1RM est. " + Math.round(k.sc * bw()) + " kg · " : ""}${k.i < R.length - 1 ? "siguiente " + R[k.i + 1] + ": " + nx : "¡Rango máximo!"}</small></div><div class=bar><i style="width:${k.pct}%"></i></div>`;
+  return `<div class=lad>${R.map((n, i) => `<i class="${i < k.i ? "d" : i == k.i ? "c" : ""}" style="--c:${C[i]}"></i>`).join("")}</div><div class=row>${bdg(k.i)}<small>${k.m ? L("1RM est. {0} kg", Math.round(k.sc * bw())) + " · " : ""}${k.i < R.length - 1 ? L("siguiente {0}", tr(R[k.i + 1])) + ": " + tr(nx) : tr("¡Rango máximo!")}</small></div><div class=bar><i style="width:${k.pct}%"></i></div>`;
 };
 const spark = (n) => {
   const a = (U.logs[n] || []).slice(-8).map((l) => rk(l.w, l.r, n).sc);
@@ -910,7 +932,7 @@ function rut() {
     d = rt[D] || rt[0],
     zmap = zm();
   return (
-    `<h2>Tu semana</h2><div class=chips>${rt.map((x, i) => `<button class="chip ${i == D ? "on" : ""}" onclick="D=${i};app()">${x.t}</button>`).join("")}</div>` +
+    progCard() + `<h2>Tu semana</h2><div class=chips>${rt.map((x, i) => `<button class="chip ${i == D ? "on" : ""}" onclick="D=${i};app()">${x.t}</button>`).join("")}</div>` +
     d.ex
       .map((e, j) => {
         const L = (U.logs[e.n] || []).slice(-1)[0],
@@ -918,11 +940,11 @@ function rut() {
           mx = iso ? 90 : dif(e.n) <= 1 ? 50 : 30,
           r0 = L ? L.r : iso ? 30 : 10,
           w0 = L ? L.w : 0;
-        return `<div class=card style="--i:${j}"><div class=row><div><b class=exn onclick="info(${j})">${esc(e.n)} ⓘ</b><br><small>${e.g} · objetivo ${e.s}×${e.r}</small></div><span class=row style="gap:4px"><button class=vid style="background:none;cursor:pointer" onclick="info(${j})">ⓘ Explicación</button><a class=vid target=_blank rel=noopener href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.n + " técnica correcta")}">▶ Vídeo</a><button class=lnk onclick="rm(${j})">✕</button></span></div>
+        return `<div class=card style="--i:${j}"><div class=row><div><b class=exn onclick="info(${j})">${esc(e.n)} ⓘ</b><br><small>${e.g[0].toUpperCase() + e.g.slice(1)} · objetivo ${progEx(e).s}×${progEx(e).r}</small></div><span class=row style="gap:4px"><button class=vid style="background:none;cursor:pointer" onclick="info(${j})">🧍 3D y técnica</button><a class=vid target=_blank rel=noopener href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.n + " técnica correcta")}">▶ Vídeo</a><button class=lnk onclick="rm(${j})">✕</button></span></div>
 <div style="margin-top:10px">${wid(j, e, w0)}</div>
 <div class=row style="margin-top:12px"><label>${iso ? "Segundos · desliza" : "Repeticiones · desliza"}</label><b class=big id=rv${j}>${r0}</b></div><input id=r${j} class=rg type=range min=0 max=${mx} value=${r0} style="--p:${(r0 / mx) * 100}%" oninput="rg(${j},this)">
-<div class=g2 style="align-items:end;margin-top:6px"><div><label>Series</label><input id=s${j} type=number value=${parseInt(e.s) || 3}></div><button class=btn style="margin-bottom:10px" onclick="logEx(${j})">Guardar ✓</button></div>
-<div class=row style="gap:12px"><div id=fg${j} style="width:96px;flex:none">${body(zmap, zonesOf(e).pri)}</div><div id=pv${j} style="flex:1">${L ? pvh(L.w, L.r, wtt(e) != "bw", e.n) : pvh(0, 0)}</div></div>${L ? `<div class=row style="margin-top:6px"><small>Último: ${L.w ? L.w + " kg" : "peso corporal"} × ${L.r} · ${L.d}</small>${spark(e.n)}</div>` : ""}</div>`;
+<div class=g2 style="align-items:end;margin-top:6px"><div><label>Series</label><input id=s${j} type=number value=${parseInt(progEx(e).s) || 3}></div><button class=btn style="margin-bottom:10px" onclick="logEx(${j})">Guardar ✓</button></div>
+<div class=row style="gap:12px"><div id=fg${j} style="width:96px;flex:none">${body(zmap, zonesOf(e).pri)}</div><div id=pv${j} style="flex:1">${L ? pvh(L.w, L.r, wtt(e) != "bw", e.n) : pvh(0, 0)}</div></div>${L ? `<div class=row style="margin-top:6px"><small>${tr("Último")}: ${L.w ? L.w + " kg" : "peso corporal"} × ${L.r} · ${new Date(L.d + "T12:00:00").toLocaleDateString(LANGS[LANG][2], { day: "numeric", month: "short" })}</small>${spark(e.n)}</div>` : ""}</div>`;
       })
       .join("") +
     `<div class=card><label>Catálogo (${new Set(Object.values(G).flatMap((x) => [...x.gym, ...x.home, ...x.park])).size} ejercicios) · añadir al día</label><div class=g2><select id=cg onchange="$('#ce').innerHTML=cl(this.value)">${Object.keys(
@@ -996,7 +1018,7 @@ function prog() {
   const ex = Object.keys(U.logs)
     .map((n) => [n, best(n)])
     .filter((x) => x[1]);
-  return `<h2>Pesaje semanal</h2><div class=card><div class=stats style="grid-template-columns:repeat(3,1fr)"><div><b>${l} kg</b><small>actual</small></div><div><b style="color:${df <= 0 ? "var(--acc)" : "inherit"}">${df > 0 ? "+" : ""}${df}</b><small>desde el inicio</small></div><div><b>${nx.slice(5)}</b><small>próximo pesaje</small></div></div>${ch}
+  return `<h2>Pesaje semanal</h2><div class=card><div class=stats style="grid-template-columns:repeat(3,1fr)"><div><b>${l} kg</b><small>actual</small></div><div><b style="color:${df <= 0 ? "var(--acc)" : "inherit"}">${df > 0 ? "+" : ""}${LANG == "en" ? df : String(df).replace(".", ",")}</b><small>desde el inicio</small></div><div><b>${new Date(nx + "T12:00:00").toLocaleDateString(LANGS[LANG][2], { day: "numeric", month: "short" })}</b><small>próximo pesaje</small></div></div>${ch}
 <label style="margin-top:10px;display:block">Pésate en ayunas, una vez por semana</label><div class=row><input id=nw type=number step=.1 placeholder="kg" style="margin:0"><button class=btn style="width:auto" onclick="addW()">Guardar</button></div></div>
 <h2>Tu mapa muscular</h2><div class=card style="text-align:center">${body(zm(), null, 1)}<small>Cada músculo toma el color de tu mejor rango en él (gris oscuro = sin registros).</small></div><h2>Tus rangos</h2>${ex.length ? ex.map(([n, k], i) => `<div class="card rk" style="--i:${i}">${badge(k.i, 40)}<div style="flex:1"><div class=row><b>${esc(n)}</b>${bdg(k.i)}</div><div class=bar><i style="width:${k.pct}%"></i></div><small>${k.i < R.length - 1 ? "Siguiente: " + R[k.i + 1] : "¡Rango máximo!"}</small></div></div>`).join("") : "<div class=card><small>Registra series en “Rutina” y aquí verás tu rango en cada ejercicio.</small></div>"}
 <small>Rango estimado con tu 1RM (fórmula de Epley) frente a tu peso corporal; en ejercicios sin peso se usan las repeticiones.</small>`;
@@ -1015,7 +1037,7 @@ function tgtFor(p, w) {
   const bmr = 10 * w + 6.25 * p.h - 5 * p.age + (p.sx == "m" ? 5 : -161),
     fa = p.act ? ACTF[p.act] + 0.05 * p.days : 1.2 + 0.06 * p.days,
     k = Math.round(bmr * fa + { grasa: p.age < 18 ? 0 : -450, musculo: 300, fuerza: 200, mantener: 0 }[p.goal]),
-    pr = Math.round((p.age < 18 ? 1.6 : p.age >= 60 ? 1.5 : p.goal == "grasa" ? 2.2 : 2) * w),
+    pr = Math.round((p.age < 18 ? 1.6 : p.dt == "hp" ? 2.4 : p.age >= 60 ? 1.5 : p.goal == "grasa" ? 2.2 : 2) * w),
     fa2 = Math.round((p.dt == "lc" ? 1.2 : 0.9) * w);
   if (p.dt == "lc") { const ca = Math.round((0.2 * k) / 4); return { k, pr, ca, fa: Math.round((k - pr * 4 - ca * 4) / 9), bmr: Math.round(bmr) }; }
   return { k, pr, fa: fa2, ca: Math.round((k - pr * 4 - fa2 * 9) / 4), bmr: Math.round(bmr) };
@@ -1044,7 +1066,10 @@ const CARB = [
     "miel",
     "maíz",
     "remolacha",
+    "fideos de arroz",
   ],
+  // Productos caros que la dieta económica evita
+  CARO = ["salmón", "gambas", "lubina", "dorada", "pulpo", "sepia", "jamón serrano", "mozzarella light", "quinoa", "tempeh", "mantequilla de almendra", "almendras", "chía", "semillas de calabaza", "granola", "queso parmesano", "arándanos"],
   RED = ["ternera", "ternera picada", "cerdo magro", "jamón serrano"],
   MED = [
     "salmón",
@@ -1072,11 +1097,13 @@ function pool(t) {
             ? CARB
             : p.dt == "med"
               ? RED
-              : [],
+              : p.dt == "eco"
+                ? CARO
+                : [],
     dz = [...(p.dis || []), ...xd],
     a = MEALS[t == "m" ? "s" : t].filter(
       (m) =>
-        !m.al.some((x) => p.al.includes(x)) &&
+        !m.al.some((x) => p.al.includes(x) || (p.dt == "sg" && x == "gluten")) &&
         !dz.some(
           (x) =>
             m.n.toLowerCase().includes(x) || m.it.some((i) => i[0].includes(x)),
@@ -1116,7 +1143,7 @@ function mealImg(m, cls) {
     ? `<figure class="mph ${cls || ""}"><img loading=lazy src="${f.f}" alt="${esc(m.n)}"><figcaption><a target=_blank rel=noopener href="${f.u}">📷 ${esc(f.a)} · ${f.l}</a></figcaption></figure>`
     : `<figure class="mph ph0 ${cls || ""}"><span>🍽</span></figure>`;
 }
-const f1 = (x) => (Math.round(x * 10) / 10).toLocaleString("es");
+const f1 = (x) => (Math.round(x * 10) / 10).toLocaleString(LANGS[LANG][2]);
 function precRow(l, v, t, u, min) {
   const d = v - t, ok = min ? d >= -Math.max(1, t * 0.02) : Math.abs(d) <= Math.max(1, t * 0.02);
   return `<div class=prow><span>${l}</span><b>${u == "kcal" ? Math.round(v) : f1(v)} ${u}</b><small>objetivo ${u == "kcal" ? t : f1(t)} ${u}</small><em class="${ok ? "ok" : ""}">${d > 0 ? "+" : ""}${u == "kcal" ? Math.round(d) : f1(d)}</em><div class=bar><i style="width:${Math.min(100, (v / t) * 100)}%"></i></div></div>`;
@@ -1125,14 +1152,14 @@ function diet() {
   const t = tgt(), p = U.p, dp = dayPlan(DD), wt = waterTarget(), fib = Math.round((t.k / 1000) * 14), sm = SM[U.sm] ? U.sm : "mercadona";
   return (
     `<h2>Tu dieta · ${GN[p.goal]} · ${act().length} comidas al día</h2><div class=stats style="grid-template-columns:repeat(5,1fr)">${[[t.k, "kcal"], [t.pr + " g", "proteína"], [t.ca + " g", "hidratos"], [t.fa + " g", "grasas"], [(wt.base / 1000).toFixed(1).replace(".", ",") + " L", "agua"]].map(([a, b], i) => `<div style="animation-delay:${i * 80}ms"><b>${a}</b><small>${b}</small></div>`).join("")}</div>
-<details class="card how"><summary>¿Cómo se calcula?</summary><small>Metabolismo basal con la fórmula de Mifflin-St Jeor (${p.sx == "m" ? "hombre" : "mujer"}, ${p.age} años, ${p.h} cm, ${bw()} kg) × tu nivel de actividad y entrenos, ${{ grasa: "−450 kcal para perder grasa", musculo: "+300 kcal para ganar músculo", fuerza: "+200 kcal para fuerza", mantener: "sin ajuste" }[p.goal]}. Proteína ${f1(t.pr / bw())} g/kg, grasa ${f1(t.fa / bw())} g/kg y el resto en hidratos. Las raciones de cada día se ajustan gramo a gramo para clavar estas cifras. Agua: 35 ml por kg (${wt.base} ml) + 600 ml los días que entrenas. Valores nutricionales de las tablas BEDCA y USDA; kcal según el etiquetado europeo.</small></details>
-${p.age < 18 ? "<div class=card><small>Estás en edad de crecimiento, así que no se aplica déficit de calorías. Come variado, no te saltes comidas y, si quieres cambiar tu peso, habla antes con tu médico.</small></div>" : ""}${hasAI() ? foodcard() : ""}<div class=chips style="margin-top:12px">${DN.map((n, i) => `<button class="chip ${i == DD ? "on" : ""}" onclick="DD=${i};app()">${n}${i == wdx() ? " · hoy" : ""}</button>`).join("")}</div>
+<details class="card how"><summary>¿Cómo se calcula?</summary><small>${L("Metabolismo basal con la fórmula de Mifflin-St Jeor ({0}, {1} años, {2} cm, {3} kg) × tu nivel de actividad y entrenos, {4}. Proteína {5} g/kg, grasa {6} g/kg y el resto en hidratos. Las raciones de cada día se ajustan gramo a gramo para clavar estas cifras. Agua: 35 ml por kg ({7} ml) + 600 ml los días que entrenas. Valores nutricionales de las tablas BEDCA y USDA; kcal según el etiquetado europeo.", tr(p.sx == "m" ? "hombre" : "mujer"), p.age, p.h, bw(), tr({ grasa: "−450 kcal para perder grasa", musculo: "+300 kcal para ganar músculo", fuerza: "+200 kcal para fuerza", mantener: "sin ajuste" }[p.goal]), f1(t.pr / bw()), f1(t.fa / bw()), wt.base)}</small></details>
+<div class=chips style="margin-top:10px">${Object.entries(DTN).map(([k, n]) => `<button class="chip ${p.dt == k ? "on" : ""}" onclick="U.p.dt='${k}';U.ch={};sv();app()">${n}</button>`).join("")}</div>${p.dt == "ayuno" ? `<div class="card note">⏱️ <b>Ayuno 16:8</b>: comes entre las 13:00 y las 21:00 (comida, merienda y cena) y ayunas las otras 16 h. Agua, café o infusiones sin azúcar están permitidos durante el ayuno.</div>` : ""}${p.age < 18 ? "<div class=card><small>Estás en edad de crecimiento, así que no se aplica déficit de calorías. Come variado, no te saltes comidas y, si quieres cambiar tu peso, habla antes con tu médico.</small></div>" : ""}${hasAI() ? foodcard() : ""}<div class=chips style="margin-top:12px">${DN.map((n, i) => `<button class="chip ${i == DD ? "on" : ""}" onclick="DD=${i};app()">${n}${i == wdx() ? " · hoy" : ""}</button>`).join("")}</div>
 <div class="card prec"><b>Precisión del ${["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"][DD]}</b>${precRow("Energía", dp.k, t.k, "kcal")}${precRow("Proteína", dp.p, t.pr, "g")}${U.p.dt == "lc" ? precRow("Hidratos (máx.)", t.ca * 2 - dp.c, t.ca, "g", 1).replace(f1(t.ca * 2 - dp.c), f1(dp.c)) : precRow("Hidratos", dp.c, Math.round(dp.ca), "g")}${precRow("Grasas", dp.f, t.fa, "g")}${precRow("Fibra (mín.)", dp.fi, fib, "g", 1)}<small>En verde: a menos de un 2 % del objetivo.</small></div>` +
     dp.meals
       .map((x, j) => {
         const P = pool(x.tp), m = x.m;
         return `<div class="card meal-card" style="--i:${j}">${mealImg(m)}<div class=row style="margin-top:10px"><div><small>${MT[x.tp][1]} ${MT[x.tp][0]}</small><br><b style="font-size:17px">${esc(m.n)}</b></div><span class=kc><b>${Math.round(x.k)}</b> kcal</span></div>
-<div class=macros><span>P <b>${f1(x.M.p)}</b> g</span><span>H <b>${f1(x.M.c)}</b> g</span><span>G <b>${f1(x.M.f)}</b> g</span><span>Fibra <b>${f1(x.M.fi)}</b> g</span></div>
+<div class=macros><span>P <b>${f1(x.M.p)}</b> g</span><span>${({ es: "H", en: "C", ca: "H", fr: "G", pt: "H" })[LANG]} <b>${f1(x.M.c)}</b> g</span><span>${({ es: "G", en: "F", ca: "G", fr: "L", pt: "G" })[LANG]} <b>${f1(x.M.f)}</b> g</span><span>Fibra <b>${f1(x.M.fi)}</b> g</span></div>
 <table class=ingt><tr><th>Ingrediente</th><th>Cantidad</th><th>kcal</th><th>Prot.</th><th></th></tr>${x.I.map(([a, g, ex]) => `<tr${ex ? " class=extra" : ""}><td>${a}${ex ? ' <span class=xtag title="Añadido para cuadrar tus macros del día">+ extra</span>' : ""}${unitTxt(a, g) ? `<small> ${unitTxt(a, g)}</small>` : ""}</td><td><b>${g} g</b></td><td>${Math.round((g * kcal100(a)) / 100)}</td><td>${f1((g * NUT[a][0]) / 100)} g</td><td><a class=buy1 title="Comprar en ${SM[sm][0]}" target=_blank rel=noopener href="${shopUrl(sm, shopQ(a))}">🛒</a></td></tr>`).join("")}</table>
 <div class=row style="gap:8px;margin-top:10px;justify-content:flex-start;flex-wrap:wrap"><button class="btn sm" onclick="cook(${DD},'${x.tp}')">👩‍🍳 Cocínalo tú · paso a paso 3D</button>${hasAI() ? `<button class="btn sm ghost" onclick="rec('${x.tp}')">🤖 Receta con IA</button>` : ""}<label class=sel>🛒 Comprar en <select onchange="U.sm=this.value;sv();app()">${Object.entries(SM).map(([k, s]) => `<option value=${k} ${k == sm ? "selected" : ""}>${s[0]}</option>`).join("")}</select></label></div>
 <details class=opts><summary>Cambiar plato (${P.length} opciones)</summary><div class=chips>${P.map((y, i) => `<button class="chip ${y === m ? "on" : ""}" onclick="U.ch['${DD}${x.tp}']=${i};sv();app()">${esc(y.n)}</button>`).join("")}</div></details></div>`;
@@ -1185,7 +1212,7 @@ function rec(tp) {
 }
 function bp(txt) {
   const p = U.p;
-  return `Eres el coach de FORJA (app de gimnasio y dieta). Responde en español, cercano y breve (máx 120 palabras salvo recetas). Cuando el usuario pida cambiar el plan usa las herramientas y confirma qué cambiaste. Molestias o dolor: pregunta zona e intensidad si falta, ofrece sustituir ejercicios, sugiere descanso y ver a un médico o fisio si es fuerte o persistente; no diagnostiques. Recetas: pasos cortos con los gramos del plan. No inventes datos del usuario. Si es menor de 18 años: no recomiendes cafeína, creatina, quemagrasas ni dietas de déficit, y deriva cualquier suplemento a su médico o pediatra.
+  return `Eres el coach de FORJA (app de gimnasio y dieta). Responde en ${{ es: "español", en: "English", ca: "català", fr: "français", pt: "português" }[LANG]}, cercano y breve (máx 120 palabras salvo recetas). Cuando el usuario pida cambiar el plan usa las herramientas y confirma qué cambiaste. Molestias o dolor: pregunta zona e intensidad si falta, ofrece sustituir ejercicios, sugiere descanso y ver a un médico o fisio si es fuerte o persistente; no diagnostiques. Recetas: pasos cortos con los gramos del plan. No inventes datos del usuario. Si es menor de 18 años: no recomiendes cafeína, creatina, quemagrasas ni dietas de déficit, y deriva cualquier suplemento a su médico o pediatra.
 PERFIL: ${JSON.stringify({ objetivo: GN[p.goal], lugar: p.where, dias: p.days, nivel: p.lv, alergias: p.al, gustos: p.likes, noGustos: p.dis || [], molestias: p.notes || [], kcal: tgt().k, edad: p.age, pesoKg: bw(), pilaSuplementos: U.stk || [] })}
 RUTINA: ${U.routine.map((d, i) => i + 1 + ") " + d.t + ": " + d.ex.map((e) => e.n).join(", ")).join(" | ")}
 DIETA (0=Lun..6=Dom; d=desayuno m=media mañana c=comida s=merienda n=cena r=recena): ${DN.map(
@@ -1465,7 +1492,7 @@ function pat(e) {
   return (
     PAT.find((p) => p[0].test(e.n)) || [
       null,
-      "Ejercicio de " + g,
+      L("Ejercicio de {0}", tr(g)),
       "Ejercicio de fuerza para esta zona: hazlo con recorrido completo y control.",
       "Tensión en el músculo trabajado, sin dolor articular.",
       "Elige un peso con el que mantengas buena técnica en todas las repeticiones.",
@@ -1529,7 +1556,7 @@ function evo(n) {
           "var(--y)",
         )}</svg><div class=lg><span><i style="background:var(--acc)"></i>${f.w ? "peso" : "reps"}</span><span><i style="background:var(--y)"></i>reps</span></div>`
       : ""
-  }<small>Volumen en este ejercicio: ${vol.toLocaleString("es")} kg · En total: ${ses} registros y ${vt.toLocaleString("es")} kg movidos.</small>`;
+  }<small>Volumen en este ejercicio: ${vol.toLocaleString(LANGS[LANG][2])} kg · En total: ${ses} registros y ${vt.toLocaleString(LANGS[LANG][2])} kg movidos.</small>`;
 }
 function info(j) {
   const e = U.routine[D].ex[j],
@@ -1540,7 +1567,7 @@ function info(j) {
     k = best(e.n);
   const zs = zonesOf(e), acc = ACC.filter((a) => a.r && a.r.test(e.n)).slice(0, 4);
   $("#xm").innerHTML =
-    `<div class=sheet><div class=row><b style="font-size:19px">${esc(e.n)}</b><button class=lnk onclick="cm()">✕</button></div><small>${ty} · ${g} · ${zs.pri.map((z) => ZN[z]).join(", ")}</small>
+    `<div class="sheet exs"><div class=row><b style="font-size:19px">${esc(e.n)}</b><button class=lnk onclick="cm()">✕</button></div><small>${ty} · ${zs.pri.map((z) => ZN[z]).join(", ") || g}</small>
 <div class=v3d id=v3d><span class=vload>Cargando modelo 3D…</span><div class=vleg><span><i style="background:#ff5a1f"></i>Principal</span><span><i style="background:#ffb547"></i>Secundario</span></div><div class=vctl><button onclick="v3c('play',this)">⏸</button><button onclick="v3c(0.5,this)">0,5×</button><button class=on onclick="v3c(1,this)">1×</button><button onclick="v3c('frente',this)">Frente</button><button onclick="v3c('lado',this)">Lado</button><button onclick="v3c('diagonal',this)">3/4</button><button onclick="v3c('rot',this)">⟳</button></div></div>
 <div class=row style="gap:12px;margin-top:10px;align-items:flex-start"><div style="width:170px;flex:none">${body(zm(), zs.pri, 2)}</div><div style="flex:1;font-size:13px"><b>Músculo principal</b><br>${m[0]}<b style="display:block;margin-top:6px">Secundarios</b>${m[1]}<b style="display:block;margin-top:6px">Recomendado</b>${r.s} series × ${r.r}${r.d != "—" ? "<br>descanso " + r.d : ""}<b style="display:block;margin-top:6px">Dificultad</b><span style="color:var(--acc)">${"★".repeat(Math.max(1, dif(e.n)))}${"☆".repeat(5 - Math.max(1, dif(e.n)))}</span><br><small>Tu rango se ajusta a este ejercicio</small>${k ? `<br><span class=bdg style="--c:${C[k.i]};margin-top:6px">Tu rango: ${R[k.i]}</span>` : ""}</div></div>
 ${acc.length ? `<h2>Accesorios recomendados</h2><div class=accs>${acc.map((a) => `<a class=acc target=_blank rel=noopener href="${ACRT[0][1] + encodeURIComponent(a.s)}"><span>${a.ic}</span><b>${a.n}</b><small>${a.why}</small></a>`).join("")}</div>` : ""}<h2>En qué consiste</h2><p style="margin:0">${ds}</p><h2>Qué deberías notar</h2><p style="margin:0">${fe}</p><h2>Consejo técnico</h2><p style="margin:0">${tp}</p>
@@ -1551,22 +1578,27 @@ ${acc.length ? `<h2>Accesorios recomendados</h2><div class=accs>${acc.map((a) =>
 }
 // Animación 3D según el nombre del ejercicio
 const ANIM = [
-  [/inclinad/i, "banca_inclinada"], [/apertura|cruces|peck|pullover/i, "aperturas"], [/francés/i, "press_frances"], [/fondos/i, "fondos"],
-  [/press banca|declinad|floor press|press con mancuernas(?! sentado)|press en máquina(?! de hombro)|convergente|svend|press en smith|press con agarre|press en banco|press cerrado|press suelo/i, "banca"],
-  [/flexion|push-up|pike|planche|plancha a pica/i, "flexion"], [/dominad|muscle-up|lever/i, "dominada"], [/jalón|pullover en polea/i, "jalon"],
-  [/remo en polea|remo sentado|remo en máquina|remo con banda sentado|remo ergómetro|remo 2000|remo en máquina a ritmo|remo intervalos/i, "remo_sentado"],
+  [/swing de hombros/i, "dominada"], [/handstand|hold de pino/i, "press_militar"], [/face pull|remo al mentón|remo alto|pallof/i, "face_pull"],
+  [/pájaros|elevaciones posteriores/i, "pajaros"], [/tríceps|extensión sobre|extensión tras|extensión con|extensión en anillas/i, "extension_triceps"], [/francés/i, "press_frances"],
+  [/press.*inclinad|aperturas.*inclinad|flexiones inclinadas|inclinado en smith/i, "banca_inclinada"], [/apertura|cruces|peck|pullover/i, "aperturas"], [/fondos/i, "fondos"],
+  [/flexion|push-up|pike|planche|plancha a pica/i, "flexion"],
+  [/press banca|floor press|press con mancuernas(?! sentado)|press en máquina(?! de hombro)|convergente|svend|press en smith|press con agarre|press en banco|press cerrado|press suelo/i, "banca"],
+  [/dominad|muscle-up|lever/i, "dominada"], [/jalón/i, "jalon"],
+  [/remo en polea|remo sentado|remo en máquina|remo con banda sentado/i, "remo_sentado"],
   [/remo|pendlay|meadows|yates|australian/i, "remo"], [/rumano|piernas rígidas|buenos días|good morning/i, "rumano"], [/peso muerto/i, "pesomuerto"],
-  [/hiperextens|superman/i, "hiperextension"], [/hip thrust|puente|elevación de cadera/i, "hip_thrust"], [/patada|kickback|hidrante|burro/i, "patada"],
-  [/abduc|aductor|clamshell/i, "aductores"], [/zancada|búlgara|step|skater|split/i, "zancada"], [/prensa|hack/i, "prensa"], [/extensión de cuádriceps|sissy|extensión de cadera/i, "extension_cuadriceps"],
-  [/curl femoral|nordic|nórdico|isquios con toalla/i, "curl_femoral"], [/gemelo|talón/i, "gemelos"], [/sentadilla|goblet|pistol|shrimp|pared/i, "sentadilla"],
-  [/press|handstand|hold de pino/i, "press_militar"], [/elevaciones? (laterales|frontales)|elevación en y|elevaciones en y/i, "elevacion_lateral"], [/pájaros|posterior/i, "pajaros"],
-  [/face pull|remo al mentón|remo alto/i, "face_pull"], [/encogimiento|escápulas/i, "encogimientos"], [/tríceps|extensión sobre|extensión tras|extensión con|extensión en/i, "extension_triceps"],
-  [/curl/i, "curl"], [/plancha|hollow|l-sit|dead bug|bird dog|isométric/i, "plancha"], [/colgado|rodillas al pecho|toes to bar|elevación de piernas en paralelas|elevación de piernas en barra/i, "elevacion_piernas"],
-  [/russian|giro|leñador|oblicuos|windshield|pallof|crunch lateral/i, "russian_twist"], [/crunch|abdominal|v-ups|rueda|elevación de piernas|tijeras/i, "crunch"],
+  [/hiperextens|superman/i, "hiperextension"], [/hip thrust|puente|elevación de cadera/i, "hip_thrust"], [/patada|kickback|hidrante|burro|extensión de cadera/i, "patada"],
+  [/abduc|aductor|clamshell/i, "aductores"], [/zancada|búlgara|step|skater|split/i, "zancada"], [/prensa|hack/i, "prensa"], [/extensión de cuádriceps|sissy/i, "extension_cuadriceps"],
+  [/curl femoral|nordic|nórdico|isquios con toalla/i, "curl_femoral"], [/gemelo|talón/i, "gemelos"], [/sprint/i, "correr"], [/sentadilla|goblet|pistol|shrimp|pared|salto|saltos|jump/i, "sentadilla"],
+  [/press/i, "press_militar"], [/elevaciones? (laterales|frontales)|elevación en y|elevaciones en y/i, "elevacion_lateral"],
+  [/encogimiento|escápulas/i, "encogimientos"],
+  [/curl/i, "curl"], [/mountain|escalador|oruga/i, "plancha"], [/plancha|hollow|l-sit|dead bug|bird dog|isométric/i, "plancha"], [/colgado|rodillas al pecho|toes to bar|elevación de piernas en paralelas|elevación de piernas en barra/i, "elevacion_piernas"],
+  [/russian|giro|leñador|oblicuos|windshield|crunch lateral/i, "russian_twist"], [/crunch|abdominal|v-ups|rueda|elevación de piernas|tijeras/i, "crunch"],
   [/swing|kettlebell/i, "swing"],
 ];
+// Cardio: animación según el aparato
+const ANIMC = [[/bici|spinning|assault/i, "bici"], [/remo/i, "remo_sentado"], [/swing|kettlebell/i, "swing"], [/jumping|tijera|comba|plank jacks/i, "jacks"], [/burpee|jump squat|salto|cajón/i, "sentadilla"], [/escalador|mountain/i, "plancha"]];
 const ANIMG = { pecho: "banca", espalda: "remo", pierna: "sentadilla", hombro: "press_militar", brazo: "curl", core: "crunch", glúteo: "hip_thrust", cardio: "correr", gemelo: "gemelos" };
-const animOf = (e) => (eg(e) == "cardio" ? "correr" : (ANIM.find(([r]) => r.test(e.n)) || [0, ANIMG[eg(e)] || "curl"])[1]);
+const animOf = (e) => (eg(e) == "cardio" ? (ANIMC.find(([r]) => r.test(e.n)) || [0, "correr"])[1] : (ANIM.find(([r]) => r.test(e.n)) || [0, ANIMG[eg(e)] || "curl"])[1]);
 let V3 = null;
 async function mount3d(e) {
   const el = $("#v3d"); if (!el) return;
@@ -1604,7 +1636,7 @@ async function aiex(j) {
   }
   try {
     const r = await s(
-      `Explica el ejercicio "${e.n}" a una persona con objetivo ${GN[U.p.goal]}, nivel ${U.p.lv == "b" ? "principiante" : "intermedio"}, que entrena en ${{ gym: "gimnasio", home: "casa", park: "parque de calistenia" }[U.p.where]}. En español, claro y breve (máx 170 palabras): 1) cómo se hace en 4 pasos, 2) qué debería notar, 3) 3 errores comunes, 4) una variante más fácil y una más difícil. Molestias del usuario: ${(U.p.notes || []).join(", ") || "ninguna"}.`,
+      `Explica el ejercicio "${e.n}" a una persona con objetivo ${GN[U.p.goal]}, nivel ${U.p.lv == "b" ? "principiante" : "intermedio"}, que entrena en ${{ gym: "gimnasio", home: "casa", park: "parque de calistenia" }[U.p.where]}. En ${{ es: "español", en: "English", ca: "català", fr: "français", pt: "português" }[LANG]}, claro y breve (máx 170 palabras): 1) cómo se hace en 4 pasos, 2) qué debería notar, 3) 3 errores comunes, 4) una variante más fácil y una más difícil. Molestias del usuario: ${(U.p.notes || []).join(", ") || "ninguna"}.`,
       {
         cache: false,
         onText: (u) => {
@@ -1772,7 +1804,7 @@ function calh() {
       s = dayStat(k);
     c += `<button class="cd ${k == sel ? "sel" : ""} ${k == today() ? "tod" : ""}" onclick="CS='${k}';app()"><span>${d}</span><em><u class="${s.lg.length ? "a" : ""}"></u><u class="${s.eat.length >= ne || s.ph.length ? "b" : ""}"></u><u class="${s.w >= hg ? "c" : ""}"></u></em></button>`;
   }
-  return `<div class=row><button class=lnk onclick="CM--;app()">◀</button><b>${base.toLocaleDateString("es", { month: "long", year: "numeric" })}</b><button class=lnk onclick="CM++;app()">▶</button></div><div class=cal>${["L", "M", "X", "J", "V", "S", "D"].map((x) => `<small style="text-align:center">${x}</small>`).join("")}${c}</div><div class=lg style="justify-content:flex-start"><span><i style="background:var(--btn)"></i>entreno</span><span><i style="background:#6a9a2f"></i>comidas</span><span><i style="background:#2f7fc0"></i>agua</span></div>${cdet(sel)}`;
+  return `<div class=row><button class=lnk onclick="CM--;app()">◀</button><b>${base.toLocaleDateString(LANGS[LANG][2], { month: "long", year: "numeric" })}</b><button class=lnk onclick="CM++;app()">▶</button></div><div class=cal>${({ es: "LMXJVSD", en: "MTWTFSS", ca: "DLDMDXDJDVDSDG", fr: "LMMJVSD", pt: "STQQSSD" })[LANG].match(LANG == "ca" ? /../g : /./g).map((x) => `<small style="text-align:center">${x}</small>`).join("")}${c}</div><div class=lg style="justify-content:flex-start"><span><i style="background:var(--btn)"></i>entreno</span><span><i style="background:#6a9a2f"></i>comidas</span><span><i style="background:#2f7fc0"></i>agua</span></div>${cdet(sel)}`;
 }
 function cdet(k) {
   const s = dayStat(k),
@@ -1787,15 +1819,15 @@ function cdet(k) {
     })
     .filter(Boolean)
     .concat(s.ph.map((x) => "📷 " + esc(x.n)));
-  return `<div class=card style="margin:8px 0 0"><b>${new Date(k + "T12:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })}</b><p style="margin:6px 0 2px"><b>🏋️ Entreno:</b> ${
+  return `<div class=card style="margin:8px 0 0"><b>${new Date(k + "T12:00:00").toLocaleDateString(LANGS[LANG][2], { weekday: "long", day: "numeric", month: "long" })}</b><p style="margin:6px 0 2px"><b>🏋️ Entreno:</b> ${
     s.lg.length
       ? Object.entries(g)
           .map(
             ([n, a]) =>
-              esc(n) +
+              esc(tr(n)) +
               " (" +
               a
-                .map((x) => (x.w ? x.w + " kg" : "PC") + "×" + x.r + "×" + x.s)
+                .map((x) => (x.w ? x.w + " kg" : tr("PC")) + "×" + x.r + "×" + x.s)
                 .join(", ") +
               ")",
           )
@@ -1849,7 +1881,7 @@ function ini() {
     ea = (U.eat || {})[td] || [],
     E = eaten(td),
     fl = (U.fl || {})[td] || [];
-  return `<div class=hero2><div class=row><div><small>${new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })}</small><h1 style="font-size:42px;margin:2px 0 0">Hola, ${esc(U.name)}</h1></div><div class=lvl><b data-n="${lv}">${lv}</b><small>nivel</small></div></div><div class=bar style="height:10px;margin-top:10px"><i style="width:${((xp - lo) / (hi - lo)) * 100}%"></i></div><small>${xp - lo} de ${hi - lo} XP para el nivel ${lv + 1}</small></div>
+  return `<div class=hero2><div class=row><div><small>${new Date().toLocaleDateString(LANGS[LANG][2], { weekday: "long", day: "numeric", month: "long" })}</small><h1 style="font-size:42px;margin:2px 0 0">${L("Hola, {0}", esc(U.name))}</h1></div><div class=lvl><b data-n="${lv}">${lv}</b><small>nivel</small></div></div><div class=bar style="height:10px;margin-top:10px"><i style="width:${((xp - lo) / (hi - lo)) * 100}%"></i></div><small>${xp - lo} de ${hi - lo} XP para el nivel ${lv + 1}</small></div>
 <div class="card" style="--i:1;background:var(--btn);border-color:var(--btn);color:var(--onbtn)"><small style="color:inherit;opacity:.8">Frase del día</small><div class=qt style="font-size:26px;line-height:1.15;margin-top:6px">«${PH[dayN() % PH.length]}»</div></div>
 <div class=stats style="grid-template-columns:repeat(3,1fr);margin-top:12px"><div><b data-n="${sk}">${sk}</b><small>días seguidos</small></div><div>${ring(wk / p.days, "var(--btn)")}<small>${wk} de ${p.days} esta semana</small></div><div><b>${W[W.length - 1].w}</b><small>kg (${dw > 0 ? "+" : ""}${dw})</small></div></div>
 <div class=card style="--i:2"><div class=row><div><b style="font-size:18px">${done ? "Hoy ya has entrenado ✅" : "Hoy toca"}</b><br><small>${esc(U.routine[nd].t)}</small></div><button class=btn style="width:auto" onclick="D=${nd};T='rut';app();scrollTo(0,0)">${done ? "Ver rutina" : "Empezar"}</button></div></div>
@@ -2423,21 +2455,44 @@ function sup() {
 function perf() {
   const p = U.p;
   return `<h2>Perfil</h2><div class=card><b>${esc(U.name)}</b><br><small>${esc(ROOT.acc[ROOT.last].e)} · ${DBR ? "☁️ en la nube" : "💾 solo este navegador"}</small><hr style="border:0;border-top:1px solid var(--bd);margin:12px 0">${p.age} años · ${p.h} cm · ${bw()} kg<br>Objetivo: ${GN[p.goal]}<br>${p.days} días · ${{ gym: "Gimnasio", home: "Casa", park: "Parque" }[p.where]}</div>
-${SB && !SBU ? `<div class=card><small>Estás sin cuenta: tus datos solo están en este navegador. Crea una cuenta para guardarlos en la nube y verlos desde cualquier dispositivo; tu plan actual se traslada solo.</small><button class=btn style="margin-top:10px" onclick="toReg()">Crear cuenta</button></div>` : ""}<button class=btn onclick="onb()" style="margin-bottom:10px">Editar datos y regenerar plan</button><button class=lnk onclick="logout()">Cerrar sesión</button><p class=mut style="font-size:12px;margin-top:16px">Modelo 3D: Xbot (three.js / Mixamo). Mapa muscular basado en react-body-highlighter (MIT). Fotos de platos: autores de Flickr con licencias Creative Commons (crédito en cada foto). Datos nutricionales: BEDCA y USDA.</p>`;
+${ROOT.last == "guest" ? `<div class=card><small>Estás sin cuenta: tus datos solo están en este navegador. Crea una cuenta para guardarlos en la nube y verlos desde cualquier dispositivo; tu plan actual se traslada solo.</small><button class=btn style="margin-top:10px" onclick="toReg()">Crear cuenta</button></div>` : ""}<button class=btn onclick="onb()" style="margin-bottom:10px">Editar datos y regenerar plan</button>
+<h2>Ajustes</h2><div class=card><div class=srow><span>🌍 Idioma</span><button class=chip onclick="langSheet()">${LANGS[LANG][0]}</button></div><div class=srow><span>🎨 Tema</span><span class=chips style="padding:0">${[["auto", "Automático"], ["dark", "Oscuro"], ["light", "Claro"]].map(([k, t]) => `<button class="chip ${(localStorage.getItem("forja_theme") || "auto") == k ? "on" : ""}" onclick="setTheme('${k}')">${t}</button>`).join("")}</span></div><div class=srow><span>💾 Copia de seguridad</span><span class=row style="gap:6px"><button class=chip onclick="expData()">Exportar</button><label class=chip style="cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)">Importar<input type=file accept=application/json hidden onchange="impData(this)"></label></span></div></div>
+<button class=lnk onclick="logout()">Cerrar sesión</button> · <button class=lnk style="color:var(--bad)" onclick="delAcc()">Borrar mis datos</button><p class=mut style="font-size:12px;margin-top:16px">Modelo 3D: Xbot (three.js / Mixamo). Mapa muscular basado en react-body-highlighter (MIT). Fotos de platos: autores de Flickr con licencias Creative Commons (crédito en cada foto). Datos nutricionales: BEDCA y USDA.</p>`;
 }
+// Iconos de línea (estilo uniforme, 24×24)
+const ICO = {
+  ini: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  rut: '<path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/>',
+  prog: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/>',
+  diet: '<path d="M7 3v8a3 3 0 0 0 3 3v7M10 3v6M4 3v6a3 3 0 0 0 3 3"/><path d="M17 3c-2 2-3 5-3 8h3v10"/>',
+  sup: '<path d="M6 7h12l-1 13H7z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>',
+  perf: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>',
+};
+const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
+function setTheme(t) { try { localStorage.setItem("forja_theme", t); } catch (e) {} if (t == "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = t; app(); }
+function expData() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(U, null, 1)], { type: "application/json" })); a.download = "forja-" + today() + ".json"; a.click(); toast("Copia descargada ✅"); }
+async function impData(el) {
+  try { const d = JSON.parse(await el.files[0].text()); if (!d || typeof d != "object" || !("logs" in d)) throw 0; if (!confirm("¿Sustituir tus datos actuales por los de la copia?")) return; for (const k of Object.keys(U)) delete U[k]; Object.assign(U, d); if (ROOT.last && ROOT.acc[ROOT.last]) ROOT.acc[ROOT.last].u = U; sv(); app(); toast("Datos importados ✅"); }
+  catch (e) { toast("Ese archivo no es una copia de FORJA"); }
+}
+async function delAcc() {
+  if (!confirm("¿Borrar todos tus datos de FORJA? No se puede deshacer.")) return;
+  if (SBU) { try { await SB.from("user_state").delete().eq("user_id", SBU.id); } catch (e) {} }
+  if (ROOT.last) delete ROOT.acc[ROOT.last];
+  ROOT.last = null; try { localStorage.setItem("forja_root", JSON.stringify(ROOT)); } catch (e) {}
+  logout();
+}
+function go2(k) { T = k; app(); scrollTo(0, 0); }
 function app() {
+  if (U.lang && U.lang != LANG && LANGS[U.lang]) { LANG = U.lang; trStart(); }
   const V = { ini, rut, prog, diet, sup, perf },
-    N = [
-      ["ini", "🏠", "Inicio"],
-      ["rut", "🏋️", "Rutina"],
-      ["prog", "📈", "Progreso"],
-      ["diet", "🥗", "Dieta"],
-      ["sup", "🛒", "Tienda"],
-      ["perf", "👤", "Perfil"],
-    ];
+    N = [["ini", "Inicio"], ["rut", "Rutina"], ["prog", "Progreso"], ["diet", "Dieta"], ["sup", "Tienda"], ["perf", "Perfil"]];
   $("#cw").style.display = hasAI() ? "block" : "none";
-  const zg = rankGlobal(zm());
-  A.innerHTML = `<header><div class=wrap><span class=logo>FORJA<span>.</span></span><button class=rchip onclick="T='prog';app();scrollTo(0,0)">${badge(zg, 24)}<span>${zg >= 0 ? R[zg] : "Sin rango"}</span></button></div></header><main class=wrap>${V[T]()}</main><nav>${N.map(([k, i, t]) => `<button class="${T == k ? "on" : ""}" onclick="T='${k}';app();scrollTo(0,0)"><b>${i}</b>${t}</button>`).join("")}</nav>`;
+  const zg = rankGlobal(zm()), L = LANGS[LANG] || LANGS.es;
+  A.innerHTML = `<div class=shell><aside class=side><span class=logo>FORJA<span>.</span></span><div class=sideu><b>${esc(U.name || "")}</b><small>${GN[U.p.goal]}</small></div>${N.map(([k, t]) => `<button class="${T == k ? "on" : ""}" onclick="go2('${k}')">${ico(k)}<span>${t}</span></button>`).join("")}<div class=sidef><button class=rchip onclick="go2('prog')">${badge(zg, 24)}<span>${zg >= 0 ? R[zg] : "Sin rango"}</span></button><button class=langb onclick="langSheet()">${L[1]} ${L[0]}</button></div></aside>
+<div class=main><header><div class=wrap><span class=logo>FORJA<span>.</span></span><div class=hdr><button class=langb onclick="langSheet()" aria-label="Idioma">${L[1]}</button><button class=rchip onclick="go2('prog')">${badge(zg, 24)}<span>${zg >= 0 ? R[zg] : "Sin rango"}</span></button></div></div></header><main class="wrap v-${T}">${V[T]()}</main></div></div>
+<nav>${N.map(([k, t]) => `<button class="${T == k ? "on" : ""}" onclick="go2('${k}')">${ico(k)}<span>${t}</span></button>`).join("")}</nav>`;
   cu();
   if (T == "ini" && U.q != today()) {
     U.q = today();

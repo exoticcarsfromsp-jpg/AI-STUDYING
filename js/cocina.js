@@ -18,22 +18,23 @@ const ICOL = {
   granola: ["#c9893c", "grano"], "mantequilla de almendra": ["#b98a5a", "liquido"], "pan de centeno": ["#6e4a2c", "pan"], "jamón serrano": ["#b8423e", "loncha"],
   tempeh: ["#c9a46a", "cubo"], coliflor: ["#f3efe2", "esfera"], remolacha: ["#8a1e3c", "rodaja"], dátiles: ["#5a3418", "esfera"], "cacao puro": ["#3e2415", "polvo"],
   aceitunas: ["#4a5a24", "esfera"], "semillas de calabaza": ["#5f7a3a", "grano"], lubina: ["#cfd6dc", "filete"], dorada: ["#d4d0c2", "filete"],
-  "pasta de legumbres": ["#d98a3a", "tira"], "tortilla de maíz": ["#f0d58a", "pan"], "pavo picado": ["#e6b7a0", "grano"],
+  "pasta de legumbres": ["#d98a3a", "tira"], "tortilla de maíz": ["#f0d58a", "pan"], "pavo picado": ["#e6b7a0", "grano"], "fideos de arroz": ["#f3efe3", "tira"], "salsa de soja": ["#3a1f10", "liquido"], "queso parmesano": ["#f3dc8a", "polvo"], "leche de coco light": ["#fbf8ef", "liquido"],
 };
 // Crudo → cocido (multiplicador de peso)
-const COCIDO = { arroz: 2.5, "pasta integral": 2.2, "pasta de legumbres": 2.2, quinoa: 2.7, cuscús: 2.5, lentejas: 2.5, garbanzos: 2.2, "judías blancas": 2.3 };
-const gtxt = (a, g) => `${g} g de ${a}`;
-const lista = (I) => I.map(([a, g]) => gtxt(a, g)).join(", ").replace(/, ([^,]*)$/, " y $1");
+const COCIDO = { "fideos de arroz": 2.4, arroz: 2.5, "pasta integral": 2.2, "pasta de legumbres": 2.2, quinoa: 2.7, cuscús: 2.5, lentejas: 2.5, garbanzos: 2.2, "judías blancas": 2.3 };
+const N = (a) => tr(a); // nombre del ingrediente en el idioma activo
+const gtxt = (a, g) => L("{0} g de {1}", g, N(a));
+const lista = (I) => { const x = I.map(([a, g]) => gtxt(a, g)); return x.length > 1 ? x.slice(0, -1).join(", ") + Y() + x[x.length - 1] : x.join(""); };
 
 function pasos(m, I) {
   const n = m.n.toLowerCase(), has = (a) => I.find((x) => x[0] === a), S = [];
   const batido = /batido|smoothie/.test(n);
   if (batido) {
-    S.push({ a: "verter", t: `Pon en la batidora los líquidos: ${lista(I.filter(([a]) => ICOL[a]?.[1] === "liquido"))}.` });
+    S.push({ a: "verter", t: L("Pon en la batidora los líquidos: {0}.", lista(I.filter(([a]) => ICOL[a]?.[1] === "liquido"))) });
     const resto = I.filter(([a]) => ICOL[a]?.[1] !== "liquido");
-    if (resto.length) S.push({ a: "cortar", t: `Añade troceado: ${lista(resto)}.` });
-    S.push({ a: "batir", t: "Bate a máxima potencia hasta que quede sin grumos.", min: 1 });
-    S.push({ a: "emplatar", t: "Sírvelo en un vaso grande y bébelo al momento." });
+    if (resto.length) S.push({ a: "cortar", t: L("Añade troceado: {0}.", lista(resto)) });
+    S.push({ a: "batir", t: L("Bate a máxima potencia hasta que quede sin grumos."), min: 1 });
+    S.push({ a: "emplatar", t: L("Sírvelo en un vaso grande y bébelo al momento.") });
     return S;
   }
   const crudos = ["tomate", "ensalada", "pepino", "zanahoria", "aguacate", "remolacha", "fruta", "fresas", "plátano", "manzana", "cebolla", "pimiento", "calabacín", "berenjena", "champiñón", "calabaza", "patata", "boniato", "coliflor", "brócoli"];
@@ -44,51 +45,52 @@ function pasos(m, I) {
   const verdCoc = I.filter(([a]) => ["brócoli", "judías verdes", "espárragos", "coliflor", "calabacín", "berenjena", "pimiento", "champiñón", "espinacas", "calabaza", "cebolla", "guisantes"].includes(a));
   const horno = /horno|gratinad|rellen|asad/.test(n);
   const crema = /crema de|puré/.test(n);
-  if (cortar.length) S.push({ a: "cortar", t: `Lava y corta: ${lista(cortar)}.` });
+  if (cortar.length) S.push({ a: "cortar", t: L("Lava y corta: {0}.", lista(cortar)) });
   // Hidratos que hay que cocer
   for (const [a, g] of carb) {
     const c = Math.round(g * COCIDO[a]);
-    if (/lentejas|garbanzos|judías/.test(a)) S.push({ a: "hervir", t: `Usa ${a} cocidas de bote (${c} g escurridas equivalen a tus ${g} g en seco) o cuécelas de antemano. Caliéntalas 5 minutos.`, min: 5 });
-    else if (a === "cuscús") S.push({ a: "reposar", t: `Pon ${g} g de cuscús en un bol, cubre con ${g} ml de agua hirviendo con sal y tapa 5 minutos. Separa los granos con un tenedor (≈ ${c} g cocido).`, min: 5 });
-    else S.push({ a: "hervir", t: `Cuece ${g} g de ${a} en agua con sal (quedarán ≈ ${c} g cocidos).`, min: a === "arroz" || a === "quinoa" ? 12 : 10 });
+    if (/lentejas|garbanzos|judías/.test(a)) S.push({ a: "hervir", t: L("Usa {0} cocidas de bote ({1} g escurridas equivalen a tus {2} g en seco) o cuécelas de antemano. Caliéntalas 5 minutos.", N(a), c, g), min: 5 });
+    else if (a === "cuscús") S.push({ a: "reposar", t: L("Pon {0} g de cuscús en un bol, cubre con {0} ml de agua hirviendo con sal y tapa 5 minutos. Separa los granos con un tenedor (≈ {1} g cocido).", g, c), min: 5 });
+    else S.push({ a: "hervir", t: L("Cuece {0} en agua con sal (quedarán ≈ {1} g cocidos).", gtxt(a, g), c), min: a === "arroz" || a === "quinoa" ? 12 : 10 });
   }
-  if (has("avena") && !/tortita|tortilla/.test(n)) S.push({ a: "hervir", t: `Calienta ${gtxt("avena", has("avena")[1])}${has("leche") ? " con " + has("leche")[1] + " g de leche" : has("bebida de avena") ? " con " + has("bebida de avena")[1] + " g de bebida de avena" : " con agua"} removiendo hasta que espese.`, min: 4 });
+  if (has("avena") && !/tortita|tortilla/.test(n)) S.push({ a: "hervir", t: has("leche") || has("bebida de avena") ? L("Calienta {0} con {1} removiendo hasta que espese.", gtxt("avena", has("avena")[1]), gtxt(has("leche") ? "leche" : "bebida de avena", (has("leche") || has("bebida de avena"))[1])) : L("Calienta {0} con agua removiendo hasta que espese.", gtxt("avena", has("avena")[1])), min: 4 });
   if (has("patata") || has("boniato")) {
     const tub = I.filter(([a]) => a === "patata" || a === "boniato");
-    if (horno || has("boniato")) S.push({ a: "horno", t: `Asa ${lista(tub)} en dados a 200 °C.`, min: 25 });
-    else S.push({ a: "hervir", t: `Cuece ${lista(tub)} en agua con sal hasta que estén tiernas.`, min: 18 });
+    if (horno || has("boniato")) S.push({ a: "horno", t: L("Asa {0} en dados a 200 °C.", lista(tub)), min: 25 });
+    else S.push({ a: "hervir", t: L("Cuece {0} en agua con sal hasta que estén tiernas.", lista(tub)), min: 18 });
   }
   // Huevos
   if (huevos.length) {
     const h = lista(huevos);
-    if (/tortilla|tortitas/.test(n)) { S.push({ a: "batir", t: `Bate ${h} con una pizca de sal${has("avena") ? " y " + has("avena")[1] + " g de avena" : ""}.` }); S.push({ a: "plancha", t: "Cuaja en la sartén a fuego medio, dale la vuelta y termina.", min: 4 }); }
-    else if (/revuelto|revueltos/.test(n)) { S.push({ a: "batir", t: `Bate ${h}.` }); S.push({ a: "saltear", t: "Remueve en la sartén a fuego bajo hasta que cuaje cremoso.", min: 3 }); }
-    else if (/al plato/.test(n)) S.push({ a: "horno", t: `Casca ${h} sobre la salsa y hornea a 200 °C hasta que cuaje la clara.`, min: 10 });
-    else S.push({ a: "hervir", t: `Cuece ${h} 10 minutos, enfría en agua fría y pela.`, min: 10 });
+    if (/tortilla|tortitas/.test(n)) { S.push({ a: "batir", t: has("avena") ? L("Bate {0} con una pizca de sal y {1}.", h, gtxt("avena", has("avena")[1])) : L("Bate {0} con una pizca de sal.", h) }); S.push({ a: "plancha", t: L("Cuaja en la sartén a fuego medio, dale la vuelta y termina."), min: 4 }); }
+    else if (/revuelto|revueltos/.test(n)) { S.push({ a: "batir", t: L("Bate {0}.", h) }); S.push({ a: "saltear", t: L("Remueve en la sartén a fuego bajo hasta que cuaje cremoso."), min: 3 }); }
+    else if (/al plato/.test(n)) S.push({ a: "horno", t: L("Casca {0} sobre la salsa y hornea a 200 °C hasta que cuaje la clara.", h), min: 10 });
+    else S.push({ a: "hervir", t: L("Cuece {0} 10 minutos, enfría en agua fría y pela.", h), min: 10 });
   }
   // Proteína principal
   for (const [a, g] of prot) {
-    if (/picad/.test(a)) S.push({ a: "saltear", t: `Dora ${g} g de ${a} desmenuzándola.`, min: 6 });
-    else if (a === "gambas") S.push({ a: "saltear", t: `Saltea ${g} g de gambas a fuego fuerte.`, min: 3 });
-    else if (a === "mejillones") S.push({ a: "hervir", t: `Haz ${g} g de mejillones al vapor con la olla tapada hasta que se abran.`, min: 5 });
-    else if (a === "pulpo") S.push({ a: "hervir", t: `Calienta ${g} g de pulpo cocido y córtalo en rodajas.`, min: 3 });
-    else if (a === "tofu" || a === "tempeh") S.push({ a: "saltear", t: `Seca y corta en dados ${g} g de ${a}; dóralo por todos los lados.`, min: 7 });
-    else if (horno && /salmón|merluza|bacalao|lubina|dorada/.test(a)) S.push({ a: "horno", t: `Hornea ${g} g de ${a} a 200 °C con sal y limón.`, min: /lubina|dorada/.test(a) ? 18 : 12 });
-    else S.push({ a: "plancha", t: `Haz ${g} g de ${a} a la plancha con sal y pimienta${/pollo|pavo|cerdo/.test(a) ? " hasta que esté bien hecho por dentro" : ""}.`, min: /pollo|pavo|cerdo/.test(a) ? 8 : /ternera/.test(a) ? 4 : 5 });
+    if (/picad/.test(a)) S.push({ a: "saltear", t: L("Dora {0} desmenuzándola.", gtxt(a, g)), min: 6 });
+    else if (a === "pavo" && /tortita|sándwich|pan de|tostada|tomate$/i.test(n)) S.push({ a: "verter", t: L("Sirve {0}.", gtxt(a, g)) }); // pavo en lonchas
+    else if (a === "gambas") S.push({ a: "saltear", t: L("Saltea {0} a fuego fuerte.", gtxt(a, g)), min: 3 });
+    else if (a === "mejillones") S.push({ a: "hervir", t: L("Haz {0} al vapor con la olla tapada hasta que se abran.", gtxt(a, g)), min: 5 });
+    else if (a === "pulpo") S.push({ a: "hervir", t: L("Calienta {0} (ya cocido) y córtalo en rodajas.", gtxt(a, g)), min: 3 });
+    else if (a === "tofu" || a === "tempeh") S.push({ a: "saltear", t: L("Seca y corta en dados {0}; dóralo por todos los lados.", gtxt(a, g)), min: 7 });
+    else if (horno && /salmón|merluza|bacalao|lubina|dorada/.test(a)) S.push({ a: "horno", t: L("Hornea {0} a 200 °C con sal y limón.", gtxt(a, g)), min: /lubina|dorada/.test(a) ? 18 : 12 });
+    else S.push({ a: "plancha", t: /pollo|pavo|cerdo/.test(a) ? L("Haz {0} a la plancha con sal y pimienta hasta que esté bien hecho por dentro.", gtxt(a, g)) : L("Haz {0} a la plancha con sal y pimienta.", gtxt(a, g)), min: /pollo|pavo|cerdo/.test(a) ? 8 : /ternera/.test(a) ? 4 : 5 });
   }
   if (verdCoc.length) {
-    if (crema) { S.push({ a: "hervir", t: `Cuece ${lista(verdCoc)} cubiertos de agua.`, min: 15 }); S.push({ a: "batir", t: "Tritura con parte del caldo hasta que quede fina.", min: 1 }); }
-    else if (verdCoc.every(([a]) => ["brócoli", "judías verdes", "espárragos", "coliflor", "guisantes"].includes(a))) S.push({ a: "hervir", t: `Cuece al vapor ${lista(verdCoc)}.`, min: 5 });
-    else S.push({ a: "saltear", t: `Saltea ${lista(verdCoc)}${has("aceite de oliva") ? " con " + has("aceite de oliva")[1] + " g de aceite de oliva" : ""}.`, min: 5 });
+    if (crema) { S.push({ a: "hervir", t: L("Cuece {0} cubiertos de agua.", lista(verdCoc)), min: 15 }); S.push({ a: "batir", t: L("Tritura con parte del caldo hasta que quede fina."), min: 1 }); }
+    else if (verdCoc.every(([a]) => ["brócoli", "judías verdes", "espárragos", "coliflor", "guisantes"].includes(a))) S.push({ a: "hervir", t: L("Cuece al vapor {0}.", lista(verdCoc)), min: 5 });
+    else S.push({ a: "saltear", t: has("aceite de oliva") ? L("Saltea {0} con {1}.", lista(verdCoc), gtxt("aceite de oliva", has("aceite de oliva")[1])) : L("Saltea {0}.", lista(verdCoc)), min: 5 });
   }
-  if (has("pan integral") || has("pan de centeno")) S.push({ a: "tostar", t: `Tuesta ${lista(I.filter(([a]) => /^pan/.test(a)))}.`, min: 3 });
-  if (has("wrap") || has("tortilla de maíz")) S.push({ a: "plancha", t: `Calienta ${lista(I.filter(([a]) => a === "wrap" || a === "tortilla de maíz"))} 30 segundos por lado.`, min: 1 });
+  if (has("pan integral") || has("pan de centeno")) S.push({ a: "tostar", t: L("Tuesta {0}.", lista(I.filter(([a]) => /^pan/.test(a)))), min: 3 });
+  if (has("wrap") || has("tortilla de maíz")) S.push({ a: "plancha", t: L("Calienta {0} 30 segundos por lado.", lista(I.filter(([a]) => a === "wrap" || a === "tortilla de maíz"))), min: 1 });
   const frios = I.filter(([a]) => ["yogur griego", "kéfir", "queso cottage", "requesón", "queso fresco", "hummus", "leche", "bebida de avena", "salsa de tomate"].includes(a) && !(a === "leche" && has("avena")));
-  if (frios.length) S.push({ a: "verter", t: `Sirve ${lista(frios)}.` });
+  if (frios.length) S.push({ a: "verter", t: L("Sirve {0}.", lista(frios)) });
   const top = I.filter(([a]) => ["nueces", "almendras", "chía", "miel", "granola", "semillas de calabaza", "cacao puro", "crema de cacahuete", "mantequilla de almendra", "arándanos", "dátiles", "aceitunas", "mozzarella light", "jamón serrano", "atún", "maíz", "edamame", "proteína en polvo"].includes(a));
-  if (top.length) S.push({ a: "mezclar", t: `Añade y mezcla: ${lista(top)}.` });
+  if (top.length) S.push({ a: "mezclar", t: L("Añade y mezcla: {0}.", lista(top)) });
   const oil = has("aceite de oliva");
-  S.push({ a: "emplatar", t: `Emplata${oil ? ` y aliña con ${oil[1]} g de aceite de oliva (≈ ${Math.round((oil[1] / 10) * 10) / 10} cucharadas)` : ""}. ¡Listo!` });
+  S.push({ a: "emplatar", t: oil ? L("Emplata y aliña con {0} (≈ {1} cucharadas). ¡Listo!", gtxt("aceite de oliva", oil[1]), String(Math.round((oil[1] / 10) * 10) / 10).replace(".", ",")) : L("Emplata. ¡Listo!") });
   return S;
 }
 const recipiente = (n) => (/batido|smoothie|kéfir con|pudin/i.test(n) ? "vaso" : /bowl|crema|yogur|porridge|gachas|lentejas|curry|ensalada|hummus|requesón|cottage|edamame|aceitunas/i.test(n) ? "bol" : "plato");
@@ -119,7 +121,7 @@ function ckGo(dx) {
   const s = CK.steps[CK.i];
   clearInterval(CK.int); CK.int = null; CK.t = (s.min || 0) * 60;
   $("#cka").textContent = `Paso ${CK.i + 1}/${CK.steps.length} · ${CKN[s.a] || s.a}`;
-  $("#ckt").textContent = s.t;
+  $("#ckt").textContent = s.t; $("#ckt").setAttribute("data-notr", "");
   document.querySelectorAll("#sdots i").forEach((d, i) => d.classList.toggle("on", i <= CK.i));
   $("#ckn").textContent = CK.i === CK.steps.length - 1 ? "¡Terminado! 🎉" : "Siguiente →";
   CK.scene?.setStep(s, CK.rec, CK.i);
@@ -135,5 +137,5 @@ function ckPlay() {
   CK.int = setInterval(() => { CK.t--; if (CK.t <= 0) { clearInterval(CK.int); CK.int = null; CK.t = 0; try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} toast("⏰ ¡Tiempo! Pasa al siguiente paso"); } ckT(); }, 1000);
   ckT();
 }
-function ckVoz() { if (!("speechSynthesis" in window) || !CK) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(CK.steps[CK.i].t); u.lang = "es-ES"; speechSynthesis.speak(u); }
+function ckVoz() { if (!("speechSynthesis" in window) || !CK) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(CK.steps[CK.i].t); u.lang = LANGS[LANG][2]; speechSynthesis.speak(u); }
 function ckClose() { if (!CK) return; clearInterval(CK.int); try { speechSynthesis.cancel(); } catch (e) {} CK.scene?.dispose(); CK = null; }

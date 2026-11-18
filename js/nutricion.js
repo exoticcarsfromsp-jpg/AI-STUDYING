@@ -25,6 +25,7 @@ const NUT = {
   tempeh: [19, 6, 11, 5], coliflor: [1.9, 3, 0.3, 2], remolacha: [1.6, 8, 0.2, 2.8], dátiles: [2.5, 66, 0.4, 7],
   "cacao puro": [20, 11, 11, 33], aceitunas: [1, 1, 15, 3], "semillas de calabaza": [30, 5, 49, 6], lubina: [18, 0, 3, 0],
   dorada: [19, 0, 4, 0], "pasta de legumbres": [22, 48, 2.5, 9], "tortilla de maíz": [5.7, 45, 3, 6], "pavo picado": [20, 0, 6, 0],
+  "fideos de arroz": [6, 80, 0.6, 1.6], "salsa de soja": [8, 5, 0.1, 0.8], "queso parmesano": [33, 0, 28, 0], "leche de coco light": [0.6, 2.7, 7, 0],
 };
 const kcal100 = (a) => { const n = NUT[a] || [0, 0, 0, 0]; return 4 * n[0] + 4 * n[1] + 9 * n[2] + 2 * n[3]; };
 // Compatibilidad con el resto de la app (ING = kcal/100 g, MAC = [P, C, G])
@@ -36,7 +37,7 @@ const UNIT = { huevo: [60, "huevo", "huevos"], plátano: [120, "plátano", "plá
   wrap: [60, "wrap", "wraps"], "tortilla de maíz": [30, "tortilla", "tortillas"], "pan integral": [35, "rebanada", "rebanadas"], "pan de centeno": [35, "rebanada", "rebanadas"],
   dátiles: [8, "dátil", "dátiles"], aguacate: [150, "aguacate", "aguacates"], "proteína en polvo": [30, "cacito", "cacitos"], "aceite de oliva": [10, "cucharada", "cucharadas"],
   miel: [7, "cucharadita", "cucharaditas"], claras: [33, "clara", "claras"], tomate: [120, "tomate", "tomates"] };
-const unitTxt = (a, g) => { const u = UNIT[a]; if (!u) return ""; const n = Math.round((g / u[0]) * 2) / 2; return n >= 0.5 ? `≈ ${String(n).replace(".", ",")} ${n === 1 ? u[1] : u[2]}` : ""; };
+const unitTxt = (a, g) => { const u = UNIT[a]; if (!u) return ""; const n = Math.round((g / u[0]) * 2) / 2; return n >= 0.5 ? `≈ ${LANG == "en" ? n : String(n).replace(".", ",")} ${tr(n <= 1 ? u[1] : u[2])}` : ""; };
 
 const mac = (I) => I.reduce((o, [a, g]) => { const m = NUT[a] || [0, 0, 0, 0]; o.p += (g * m[0]) / 100; o.c += (g * m[1]) / 100; o.f += (g * m[2]) / 100; o.fi += (g * m[3]) / 100; return o; }, { p: 0, c: 0, f: 0, fi: 0 });
 const kcl = (I) => I.reduce((s, [a, g]) => s + (g * kcal100(a)) / 100, 0);
@@ -50,7 +51,7 @@ function role(a) {
   if ((4 * n[0]) / k >= 0.35) return "p";
   return 4 * n[1] >= 9 * n[2] ? "c" : "f";
 }
-const fine = (a) => ["aceite de oliva", "miel", "cacao puro", "chía", "nueces", "almendras", "semillas de calabaza", "crema de cacahuete", "mantequilla de almendra", "aceitunas", "dátiles", "granola", "proteína en polvo"].includes(a);
+const fine = (a) => ["salsa de soja", "queso parmesano", "aceite de oliva", "miel", "cacao puro", "chía", "nueces", "almendras", "semillas de calabaza", "crema de cacahuete", "mantequilla de almendra", "aceitunas", "dátiles", "granola", "proteína en polvo"].includes(a);
 const STEP = (a) => (a === "huevo" ? 60 : fine(a) ? 1 : 5);
 const rnd = (a, g) => Math.max(STEP(a), Math.round(g / STEP(a)) * STEP(a));
 
@@ -175,5 +176,5 @@ const shopUrl = (k, q) => { const s = SM[k] || SM.mercadona; return s[1] + encod
 // Búsqueda más útil en el súper que el nombre genérico
 const SHOPQ = { pollo: "pechuga de pollo", pavo: "pechuga de pavo", ternera: "filete de ternera", ensalada: "lechuga mezcla ensalada", fruta: "fruta", claras: "claras de huevo",
   "proteína en polvo": "proteína whey", atún: "atún al natural", "salsa de tomate": "tomate triturado", "queso fresco": "queso fresco batido 0%", "yogur griego": "yogur griego",
-  "cacao puro": "cacao puro en polvo", "tortita de arroz": "tortitas de arroz", wrap: "tortillas de trigo wrap", "tortilla de maíz": "tortillas de maíz", "pasta de legumbres": "pasta de lentejas" };
+  "cacao puro": "cacao puro en polvo", "tortita de arroz": "tortitas de arroz", wrap: "tortillas de trigo wrap", "tortilla de maíz": "tortillas de maíz", "pasta de legumbres": "pasta de lentejas", "leche de coco light": "leche de coco ligera", "queso parmesano": "parmesano rallado" };
 const shopQ = (a) => SHOPQ[a] || a;

@@ -48,6 +48,8 @@ const P = {
   hiperextension: { rx: 45, y: 0.74, props: ['banco:romano'], a: S({ lean: 60, shF: 30, shA: 70, el: 130 }), b: S({ lean: 0, shF: 30, shA: 70, el: 130 }) },
   swing: { ground: true, props: ['kettlebell'], a: S({ lean: 60, shF: 50, hipF: 55, kn: 30, hipA: 12 }), b: S({ shF: 90, hipA: 12 }), dur: 1.4 },
   correr: { ground: true, props: [], a: S({ hipF: 55, kn: 80, hipF_r: -20, kn_r: 35, shF_l: -35, shF_r: 45, el: 85, lean: 8 }), b: S({ hipF: -20, kn: 35, hipF_r: 55, kn_r: 80, shF_l: 45, shF_r: -35, el: 85, lean: 8 }), dur: .9 },
+  bici: { y: 0.86, props: ['bici'], a: S({ lean: 28, shF: 70, el: 25, hipF: 95, kn: 110, hipF_r: 45, kn_r: 50 }), b: S({ lean: 28, shF: 70, el: 25, hipF: 45, kn: 50, hipF_r: 95, kn_r: 110 }), dur: 1.0 },
+  jacks: { ground: true, props: [], a: S({ shA: 10, hipA: 3 }), b: S({ shA: 165, hipA: 18, lift: 1 }), dur: 1.0 },
   russian_twist: { y: 0.16, props: ['peso:centro'], a: S({ lean: -38, twist: 40, shF: 75, shA: 20, el: 70, hipF: 72, kn: 85 }), b: S({ lean: -38, twist: -40, shF: 75, shA: 20, el: 70, hipF: 72, kn: 85 }), dur: 1.8 },
 };
 
@@ -79,6 +81,8 @@ export class ExerciseViewer {
     renderer.setSize(w, h);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.container.appendChild(renderer.domElement);
     this.renderer = renderer;
 
@@ -103,19 +107,14 @@ export class ExerciseViewer {
     scene.add(sun);
     const rim = new THREE.DirectionalLight(0xff8a3d, 1.2); rim.position.set(-4, 3, -3); scene.add(rim);
 
-    // Suelo de gimnasio
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(3.2, 64), new THREE.MeshStandardMaterial({ color: 0x1b1f26, roughness: .9 }));
-    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(3.1, 3.2, 64), new THREE.MeshBasicMaterial({ color: 0xff6a1a }));
-    ring.rotation.x = -Math.PI / 2; ring.position.y = .002; scene.add(ring);
-    const grid = new THREE.GridHelper(6, 24, 0x2f3540, 0x262b33); grid.position.y = .001; scene.add(grid);
+    this.buildGym(scene);
 
     const pm = new THREE.PMREMGenerator(renderer);
     scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture;
     this.buildBody();
     this.buildProps();
     this.highlight();
-    this.ready = this.loadPro(this.ej.model || 'assets/3d/Xbot.glb').catch((e) => console.warn('Modelo 3D no disponible', e));
+    this.ready = this.loadPro(this.ej.model || 'assets/3d/Xbot.glb').catch((e) => console.warn('Modelo 3D no disponible', e)).then(() => { if (!this._disposed) this.frame(); });
     if (this.props.respaldo) {
       this.pose(this.pat.b);
       const v = new THREE.Vector3(); this.torsoBarMount.getWorldPosition(v);
@@ -303,6 +302,16 @@ export class ExerciseViewer {
         const p = new THREE.Mesh(new THREE.BoxGeometry(.7, .7, .06), frame); this.scene.add(addShadow(p)); this.props.plataforma = p;
       }
       if (tipo === 'cuerpo') { /* sentado en el suelo */ }
+      if (tipo === 'bici') {
+        const g = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(.2, .06, 1.0), frame); base.position.set(0, .03, .1); g.add(base);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(.07, .7, .07), frame); post.position.set(0, .4, -.05); post.rotation.x = -.25; g.add(post);
+        const saddle = new THREE.Mesh(new THREE.BoxGeometry(.18, .05, .26), pad); saddle.position.set(0, .78, -.12); g.add(saddle);
+        const fr = new THREE.Mesh(new THREE.BoxGeometry(.07, .95, .07), frame); fr.position.set(0, .5, .48); fr.rotation.x = .3; g.add(fr);
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, .45, 10), metal); bar.rotation.z = Math.PI / 2; bar.position.set(0, 1.0, .58); g.add(bar);
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .06, 28), red); wheel.rotation.z = Math.PI / 2; wheel.position.set(0, .3, .45); g.add(wheel);
+        this.scene.add(addShadow(g));
+      }
     }
   }
 
@@ -478,6 +487,8 @@ export class ExerciseViewer {
     }
     this.pose(p);
     if (this.xbot) this.retarget();
+    const rep = Math.floor(this.t / dur) + 1;
+    if (this.repEl && rep !== this._rep) { this._rep = rep; this.repEl.innerHTML = `<b>${rep}</b><span>rep</span>`; }
     this.updateProps();
     this.phase = k;
   }
@@ -528,8 +539,71 @@ export class ExerciseViewer {
   toggle() { this.playing = !this.playing; return this.playing; }
   autoRotate(on) { this.controls.autoRotate = on; }
   view(nombre) {
-    const v = { frente: [0, 1.4, 4], lado: [4, 1.4, 0], diagonal: [2.6, 1.7, 3.2], arriba: [0.01, 4.5, 0.6] }[nombre];
-    if (v) this.camera.position.set(...v);
+    const t = this.controls.target, d = this.dist || 4.2;
+    const v = { frente: [0, .25, 1], lado: [1, .25, 0], diagonal: [.62, .33, .76], arriba: [.01, 1, .12] }[nombre];
+    if (!v) return;
+    const dir = new THREE.Vector3(...v).normalize();
+    this.camera.position.copy(t).addScaledVector(dir, d);
+  }
+  // Encuadre automático: caja que ocupa el cuerpo en las dos posiciones del ejercicio
+  frame() {
+    const box = new THREE.Box3(), tmp = new THREE.Box3();
+    for (const p of [this.pat.a, this.pat.b]) {
+      this.pose({ ...this.pat.a, ...p }); if (this.xbot) this.retarget();
+      this.xbot ? tmp.setFromObject(this.xbot) : tmp.setFromObject(this.root);
+      box.union(tmp);
+    }
+    for (const o of Object.values(this.props)) if (o && o.isObject3D) box.expandByObject(o);
+    if (this.pat.lockHands) box.max.y += .35;
+    const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    this.controls.target.set(0, Math.max(.45, c.y), c.z * .6);
+    const fov = this.camera.fov * Math.PI / 180, need = Math.max(sz.y, sz.z * .8, sz.x * .7) * 1.25 + .4;
+    this.dist = Math.min(6, Math.max(2.3, need / (2 * Math.tan(fov / 2))));
+    const lying = Math.abs(this.pat.rx || 0) > 40 || this.pat.lockHands && this.pat.lockHands[1] < .5;
+    this.view(lying ? 'lado' : 'diagonal');
+    if (lying) this.camera.position.add(new THREE.Vector3(0, .25, this.dist * .45));
+    this.controls.update();
+  }
+  buildGym(scene) {
+    // Suelo de caucho con losetas
+    const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d');
+    x.fillStyle = '#16191f'; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 9000; i++) { x.fillStyle = Math.random() < .5 ? '#1c2028' : '#121418'; x.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+    x.strokeStyle = '#0a0b0e'; x.lineWidth = 6; x.strokeRect(0, 0, 512, 512);
+    const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(8, 8); tex.colorSpace = THREE.SRGBColorSpace;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshStandardMaterial({ map: tex, roughness: .92 }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    // Plataforma de levantamiento
+    const plat = new THREE.Mesh(new THREE.BoxGeometry(2.4, .03, 2.4), new THREE.MeshStandardMaterial({ color: 0x23272f, roughness: .8 }));
+    plat.position.y = .015; plat.receiveShadow = true; scene.add(plat);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(2.44, .031, .05), new THREE.MeshStandardMaterial({ color: 0xff5a1f, emissive: 0xff5a1f, emissiveIntensity: .4 }));
+    for (const z of [-1.2, 1.2]) { const e = edge.clone(); e.position.set(0, .016, z); scene.add(e); }
+    // Pared con espejo y logo
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(14, 6), new THREE.MeshStandardMaterial({ color: 0x1a1d24, roughness: .95 }));
+    wall.position.set(0, 3, -3.2); scene.add(wall);
+    const mirror = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.9), new THREE.MeshStandardMaterial({ color: 0x9aa7b8, metalness: 1, roughness: .08 }));
+    mirror.position.set(0, 1.35, -3.18); scene.add(mirror);
+    const lc = document.createElement('canvas'); lc.width = 512; lc.height = 128; const l = lc.getContext('2d');
+    l.font = 'bold 92px Anton, Impact, sans-serif'; l.textAlign = 'center'; l.textBaseline = 'middle'; l.fillStyle = '#eef2f7'; l.fillText('FORJA', 236, 68); l.fillStyle = '#ff5a1f'; l.fillText('.', 372, 68);
+    const lt = new THREE.CanvasTexture(lc); lt.colorSpace = THREE.SRGBColorSpace;
+    const logo = new THREE.Mesh(new THREE.PlaneGeometry(1.6, .4), new THREE.MeshBasicMaterial({ map: lt, transparent: true }));
+    logo.position.set(0, 2.75, -3.17); scene.add(logo);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(6.2, .04, .04), new THREE.MeshBasicMaterial({ color: 0xff5a1f }));
+    strip.position.set(0, 2.42, -3.15); scene.add(strip);
+    // Rack de mancuernas decorativo
+    const rackM = new THREE.MeshStandardMaterial({ color: 0x2c313a, metalness: .6, roughness: .4 }), dbM = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: .5 }), chrome = new THREE.MeshStandardMaterial({ color: 0xc8ccd2, metalness: .9, roughness: .25 });
+    const rack = new THREE.Group();
+    for (const y of [.45, .8]) { const sh = new THREE.Mesh(new THREE.BoxGeometry(2.2, .04, .35), rackM); sh.position.set(0, y, 0); sh.rotation.x = -.18; rack.add(sh); }
+    for (const xx of [-1.05, 1.05]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(.06, .9, .3), rackM); leg.position.set(xx, .45, 0); rack.add(leg); }
+    for (let i = 0; i < 7; i++) for (const y of [.5, .85]) {
+      const d = new THREE.Group(), sz = .055 + i * .006;
+      const h = new THREE.Mesh(new THREE.CylinderGeometry(.015, .015, .16, 8), chrome); h.rotation.z = Math.PI / 2; d.add(h);
+      for (const sx of [-1, 1]) { const hb = new THREE.Mesh(new THREE.CylinderGeometry(sz, sz, .06, 6), dbM); hb.rotation.z = Math.PI / 2; hb.position.x = sx * .1; d.add(hb); }
+      d.position.set(-.9 + i * .3, y + sz, 0); rack.add(d);
+    }
+    rack.position.set(-2.4, 0, -2.6); rack.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(rack);
+    // Contador de repeticiones
+    this.repEl = document.createElement('div'); this.repEl.className = 'v3rep'; this.container.appendChild(this.repEl);
   }
   dispose() {
     this._disposed = true;
