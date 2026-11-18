@@ -804,5 +804,41 @@ window.FOTOS = {
 "a": "The Marmot",
 "l": "CC BY 2.0",
 "u": "https://www.flickr.com/photos/38142119@N00/15046644535"
+},
+"Overnight oats de cacao y plátano": {
+"f": "assets/img/comidas/overnight-oats-de-cacao-y-platano.jpg",
+"a": "joyosity",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/33993074@N00/14346590872"
+},
+"Tostada de salmón ahumado y aguacate": {
+"f": "assets/img/comidas/tostada-de-salmon-ahumado-y-aguacate.jpg",
+"a": "ultrakml",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/34948727@N00/17554563303"
+},
+"Tostada de crema de cacahuete y plátano": {
+"f": "assets/img/comidas/tostada-de-crema-de-cacahuete-y-platano.jpg",
+"a": "Jeff Sandquist",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/48003527@N00/4249371187"
+},
+"Fajitas de pollo": {
+"f": "assets/img/comidas/fajitas-de-pollo.jpg",
+"a": "mdid",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/58246614@N00/724169891"
+},
+"Pasta con pollo al pesto": {
+"f": "assets/img/comidas/pasta-con-pollo-al-pesto.jpg",
+"a": "axmai",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/17160135@N04/7664444646"
+},
+"Bowl de quinoa y garbanzos asados": {
+"f": "assets/img/comidas/bowl-de-quinoa-y-garbanzos-asados.jpg",
+"a": "!!!! scogle",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/11371367@N08/14692270047"
 }
 };
