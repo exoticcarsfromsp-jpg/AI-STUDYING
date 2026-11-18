@@ -672,5 +672,137 @@ window.FOTOS = {
 "a": "avlxyz",
 "l": "CC BY-SA 2.0",
 "u": "https://www.flickr.com/photos/10559879@N00/4243471794"
+},
+"Shakshuka con pan integral": {
+"f": "assets/img/comidas/shakshuka-con-pan-integral.jpg",
+"a": "joyosity",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/33993074@N00/14288893837"
+},
+"Tortitas de proteína con arándanos": {
+"f": "assets/img/comidas/tortitas-de-proteina-con-arandanos.jpg",
+"a": "m01229",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/39908901@N06/8410286566"
+},
+"Paella de pollo y verduras": {
+"f": "assets/img/comidas/paella-de-pollo-y-verduras.jpg",
+"a": "MShades",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/23054755@N00/330862780"
+},
+"Poke bowl de salmón": {
+"f": "assets/img/comidas/poke-bowl-de-salmon.jpg",
+"a": "JackyDee274",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/147206588@N07/48073769593"
+},
+"Arroz con pollo al curry": {
+"f": "assets/img/comidas/arroz-con-pollo-al-curry.jpg",
+"a": "avlxyz",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/10559879@N00/3716873144"
+},
+"Garbanzos con bacalao y espinacas": {
+"f": "assets/img/comidas/garbanzos-con-bacalao-y-espinacas.jpg",
+"a": "Gnawme",
+"l": "CC BY-ND 2.0",
+"u": "https://www.flickr.com/photos/71525439@N00/4567553676"
+},
+"Albóndigas de pavo en salsa de tomate": {
+"f": "assets/img/comidas/albondigas-de-pavo-en-salsa-de-tomate.jpg",
+"a": "vauvau",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/98193606@N00/4294654461"
+},
+"Burrito bowl de ternera": {
+"f": "assets/img/comidas/burrito-bowl-de-ternera.jpg",
+"a": "Stacy Spensley",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/21001756@N06/4386813348"
+},
+"Pad thai de gambas": {
+"f": "assets/img/comidas/pad-thai-de-gambas.jpg",
+"a": "stu_spivack",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/35034346243@N01/2606579004"
+},
+"Lentejas a la riojana fit": {
+"f": "assets/img/comidas/lentejas-a-la-riojana-fit.jpg",
+"a": "sysrq",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/81532093@N00/6080922562"
+},
+"Ensalada César con pollo": {
+"f": "assets/img/comidas/ensalada-cesar-con-pollo.jpg",
+"a": "JohnKarak",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/98231059@N00/8298867046"
+},
+"Tortilla de patatas fit": {
+"f": "assets/img/comidas/tortilla-de-patatas-fit.jpg",
+"a": "tnarik",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/80075387@N00/2327307202"
+},
+"Pisto con huevo": {
+"f": "assets/img/comidas/pisto-con-huevo.jpg",
+"a": "hashc0de",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/61791246@N00/5081512245"
+},
+"Salmón al papillote con verduras": {
+"f": "assets/img/comidas/salmon-al-papillote-con-verduras.jpg",
+"a": "methTICALman",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/46614245@N00/3750082394"
+},
+"Hamburguesa de pollo en pan integral": {
+"f": "assets/img/comidas/hamburguesa-de-pollo-en-pan-integral.jpg",
+"a": "avlxyz",
+"l": "CC BY-SA 2.0",
+"u": "https://www.flickr.com/photos/10559879@N00/1039357715"
+},
+"Sopa de pollo con fideos": {
+"f": "assets/img/comidas/sopa-de-pollo-con-fideos.jpg",
+"a": "bobjudge",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/8286199@N08/3079682439"
+},
+"Revuelto de tofu y verduras": {
+"f": "assets/img/comidas/revuelto-de-tofu-y-verduras.jpg",
+"a": "watashiwani",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/11316976@N00/4186548010"
+},
+"Tacos veganos de lentejas": {
+"f": "assets/img/comidas/tacos-veganos-de-lentejas.jpg",
+"a": "veritatem",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/66722164@N00/40758838661"
+},
+"Skyr con frutos rojos": {
+"f": "assets/img/comidas/skyr-con-frutos-rojos.jpg",
+"a": "Eric Hossinger",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/44717021@N06/5117461599"
+},
+"Barritas caseras de avena y dátiles": {
+"f": "assets/img/comidas/barritas-caseras-de-avena-y-datiles.jpg",
+"a": "PersonalCreations.com",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/127294011@N07/16087466367"
+},
+"Batido verde de proteína": {
+"f": "assets/img/comidas/batido-verde-de-proteina.jpg",
+"a": "Stacy Spensley",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/21001756@N06/8761977445"
+},
+"Sándwich de pavo y queso fresco": {
+"f": "assets/img/comidas/sandwich-de-pavo-y-queso-fresco.jpg",
+"a": "The Marmot",
+"l": "CC BY 2.0",
+"u": "https://www.flickr.com/photos/38142119@N00/15046644535"
 }
 };
